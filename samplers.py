@@ -84,6 +84,32 @@ class AIESampler(Sampler):
     def sample_prior(self):
         """Samples prior.
 
+        The real problem for being used in NS is that it is not clear how
+        to treat an Ensemble of particles.
+
+        In vanilla NS one has a set of points {x1,---,xn}, chooses the worse, replace with another.
+
+        Here the evolution of the single particle itself depends on what others are doing.
+
+        One option could be (must be confirmed by theoretical calculations) taking the currentlive points and consider them as the ensemble,
+        then generate a new point like so.
+
+        The problem is that this sampler produces ``nwalker`` particles at a time, which means that the process would be:
+
+            * generate nlive from prior (can use this func)
+            * take worst
+            * generate OTHER (nlive - 1) points
+            * pick one of theese at random
+
+        which doesn't seem a reasonable way to follow.
+
+        Well, i could by the way proceed like this:
+
+            * generate nlive from prior (can use this func)
+            * take worst -> do stuff
+            * generate a bunch of points (say M)
+            * take M worst point -> do stuff
+
         returns:
             np.ndarray : the chain obtained
         """
