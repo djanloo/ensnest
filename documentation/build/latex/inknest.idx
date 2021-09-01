@@ -1,0 +1,29 @@
+\indexentry{module@\spxentry{module}!model@\spxentry{model}}{1}
+\indexentry{model@\spxentry{model}!module@\spxentry{module}}{1}
+\indexentry{Model (class in model)@\spxentry{Model}\spxextra{class in model}}{1}
+\indexentry{log\_prior (model.Model attribute)@\spxentry{log\_prior}\spxextra{model.Model attribute}}{1}
+\indexentry{log\_likelihood (model.Model attribute)@\spxentry{log\_likelihood}\spxextra{model.Model attribute}}{1}
+\indexentry{space\_bounds (model.Model attribute)@\spxentry{space\_bounds}\spxextra{model.Model attribute}}{1}
+\indexentry{\_\_init\_\_() (model.Model method)@\spxentry{\_\_init\_\_()}\spxextra{model.Model method}}{1}
+\indexentry{is\_inside\_bounds() (model.Model method)@\spxentry{is\_inside\_bounds()}\spxextra{model.Model method}}{1}
+\indexentry{log\_chi() (model.Model method)@\spxentry{log\_chi()}\spxextra{model.Model method}}{2}
+\indexentry{new\_is\_inside\_bounds() (model.Model method)@\spxentry{new\_is\_inside\_bounds()}\spxextra{model.Model method}}{2}
+\indexentry{pointshape() (model.Model method)@\spxentry{pointshape()}\spxextra{model.Model method}}{2}
+\indexentry{unpack\_variables() (in module model)@\spxentry{unpack\_variables()}\spxextra{in module model}}{2}
+\indexentry{module@\spxentry{module}!samplers@\spxentry{samplers}}{3}
+\indexentry{samplers@\spxentry{samplers}!module@\spxentry{module}}{3}
+\indexentry{AIESampler (class in samplers)@\spxentry{AIESampler}\spxextra{class in samplers}}{3}
+\indexentry{\_\_init\_\_() (samplers.AIESampler method)@\spxentry{\_\_init\_\_()}\spxextra{samplers.AIESampler method}}{3}
+\indexentry{get\_stretch() (samplers.AIESampler method)@\spxentry{get\_stretch()}\spxextra{samplers.AIESampler method}}{3}
+\indexentry{join\_chains() (samplers.AIESampler method)@\spxentry{join\_chains()}\spxextra{samplers.AIESampler method}}{3}
+\indexentry{sample\_prior() (samplers.AIESampler method)@\spxentry{sample\_prior()}\spxextra{samplers.AIESampler method}}{3}
+\indexentry{Sampler (class in samplers)@\spxentry{Sampler}\spxextra{class in samplers}}{3}
+\indexentry{model (samplers.Sampler attribute)@\spxentry{model}\spxextra{samplers.Sampler attribute}}{4}
+\indexentry{mcmc\_lenght (samplers.Sampler attribute)@\spxentry{mcmc\_lenght}\spxextra{samplers.Sampler attribute}}{4}
+\indexentry{nwalkers (samplers.Sampler attribute)@\spxentry{nwalkers}\spxextra{samplers.Sampler attribute}}{4}
+\indexentry{\_\_init\_\_() (samplers.Sampler method)@\spxentry{\_\_init\_\_()}\spxextra{samplers.Sampler method}}{4}
+\indexentry{module@\spxentry{module}!utils@\spxentry{utils}}{4}
+\indexentry{utils@\spxentry{utils}!module@\spxentry{module}}{4}
+\indexentry{logsubexp() (in module utils)@\spxentry{logsubexp()}\spxextra{in module utils}}{4}
+\indexentry{logsumexp() (in module utils)@\spxentry{logsumexp()}\spxextra{in module utils}}{4}
+\indexentry{pointshape() (in module utils)@\spxentry{pointshape()}\spxextra{in module utils}}{4}

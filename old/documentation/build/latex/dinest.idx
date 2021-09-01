@@ -1,0 +1,32 @@
+\indexentry{module@\spxentry{module}!my\_NS@\spxentry{my\_NS}}{1}
+\indexentry{my\_NS@\spxentry{my\_NS}!module@\spxentry{module}}{1}
+\indexentry{NS() (in module my\_NS)@\spxentry{NS()}\spxextra{in module my\_NS}}{1}
+\indexentry{get\_Z\_error() (in module my\_NS)@\spxentry{get\_Z\_error()}\spxextra{in module my\_NS}}{1}
+\indexentry{logsumexp() (in module my\_NS)@\spxentry{logsumexp()}\spxextra{in module my\_NS}}{1}
+\indexentry{module@\spxentry{module}!AIE\_sampling@\spxentry{AIE\_sampling}}{2}
+\indexentry{AIE\_sampling@\spxentry{AIE\_sampling}!module@\spxentry{module}}{2}
+\indexentry{AIE\_sampling() (in module AIE\_sampling)@\spxentry{AIE\_sampling()}\spxextra{in module AIE\_sampling}}{2}
+\indexentry{dummyfunc() (in module AIE\_sampling)@\spxentry{dummyfunc()}\spxextra{in module AIE\_sampling}}{2}
+\indexentry{get\_stretch() (in module AIE\_sampling)@\spxentry{get\_stretch()}\spxextra{in module AIE\_sampling}}{3}
+\indexentry{module@\spxentry{module}!example\_docstring@\spxentry{example\_docstring}}{3}
+\indexentry{example\_docstring@\spxentry{example\_docstring}!module@\spxentry{module}}{3}
+\indexentry{module\_level\_variable1 (in module example\_docstring)@\spxentry{module\_level\_variable1}\spxextra{in module example\_docstring}}{3}
+\indexentry{ExampleClass (class in example\_docstring)@\spxentry{ExampleClass}\spxextra{class in example\_docstring}}{3}
+\indexentry{attr1 (example\_docstring.ExampleClass attribute)@\spxentry{attr1}\spxextra{example\_docstring.ExampleClass attribute}}{3}
+\indexentry{attr2 (example\_docstring.ExampleClass attribute)@\spxentry{attr2}\spxextra{example\_docstring.ExampleClass attribute}}{3}
+\indexentry{\_\_init\_\_() (example\_docstring.ExampleClass method)@\spxentry{\_\_init\_\_()}\spxextra{example\_docstring.ExampleClass method}}{4}
+\indexentry{attr3 (example\_docstring.ExampleClass attribute)@\spxentry{attr3}\spxextra{example\_docstring.ExampleClass attribute}}{4}
+\indexentry{attr4 (example\_docstring.ExampleClass attribute)@\spxentry{attr4}\spxextra{example\_docstring.ExampleClass attribute}}{4}
+\indexentry{attr5 (example\_docstring.ExampleClass attribute)@\spxentry{attr5}\spxextra{example\_docstring.ExampleClass attribute}}{4}
+\indexentry{example\_method() (example\_docstring.ExampleClass method)@\spxentry{example\_method()}\spxextra{example\_docstring.ExampleClass method}}{4}
+\indexentry{readonly\_property() (example\_docstring.ExampleClass property)@\spxentry{readonly\_property()}\spxextra{example\_docstring.ExampleClass property}}{4}
+\indexentry{readwrite\_property() (example\_docstring.ExampleClass property)@\spxentry{readwrite\_property()}\spxextra{example\_docstring.ExampleClass property}}{4}
+\indexentry{ExampleError@\spxentry{ExampleError}}{4}
+\indexentry{msg (example\_docstring.ExampleError attribute)@\spxentry{msg}\spxextra{example\_docstring.ExampleError attribute}}{5}
+\indexentry{code (example\_docstring.ExampleError attribute)@\spxentry{code}\spxextra{example\_docstring.ExampleError attribute}}{5}
+\indexentry{\_\_init\_\_() (example\_docstring.ExampleError method)@\spxentry{\_\_init\_\_()}\spxextra{example\_docstring.ExampleError method}}{5}
+\indexentry{example\_generator() (in module example\_docstring)@\spxentry{example\_generator()}\spxextra{in module example\_docstring}}{5}
+\indexentry{function\_with\_pep484\_type\_annotations() (in module example\_docstring)@\spxentry{function\_with\_pep484\_type\_annotations()}\spxextra{in module example\_docstring}}{5}
+\indexentry{function\_with\_types\_in\_docstring() (in module example\_docstring)@\spxentry{function\_with\_types\_in\_docstring()}\spxextra{in module example\_docstring}}{5}
+\indexentry{module\_level\_function() (in module example\_docstring)@\spxentry{module\_level\_function()}\spxextra{in module example\_docstring}}{6}
+\indexentry{module\_level\_variable2 (in module example\_docstring)@\spxentry{module\_level\_variable2}\spxextra{in module example\_docstring}}{7}
