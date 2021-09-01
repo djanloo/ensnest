@@ -36,7 +36,7 @@ class Model:
         self.bounds          = space_bounds
 
         self.log_prior       = lambda x: log_prior(x)       + self.log_chi(x)
-        self.log_likelihood  = lambda x: log_likelihood(x)  + self.log_chi(x)
+        self.log_likelihood  = lambda x: log_likelihood(x) 
 
         try:
             self.space_dim   = space_bounds[0].shape[0]
