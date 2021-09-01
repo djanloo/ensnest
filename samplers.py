@@ -81,8 +81,8 @@ class AIESampler(Sampler):
 
         return (U(0,1, size = size )*(self.space_scale**(1/2) - self.space_scale**(-1/2) ) + self.space_scale**(-1/2) )**2
 
-    def sample_prior(self):
-        """Samples prior.
+    def sample_function(self,log_function):
+        """Samples function.
 
         The real problem for being used in NS is that it is not clear how
         to treat an Ensemble of particles.
@@ -113,7 +113,7 @@ class AIESampler(Sampler):
         returns:
             np.ndarray : the chain obtained
         """
-        for t in tqdm(range(self.length - 1), desc = f'Sampling log_prior' ):
+        for t in trange(self.length - 1):
 
             current_index = np.arange(self.nwalkers)
             current_value = self.chain[t,current_index, :]
@@ -128,7 +128,7 @@ class AIESampler(Sampler):
             z = self.get_stretch(size = self.nwalkers)
             proposal = pivot_value + z[:,None] * (current_value - pivot_value)
 
-            log_accept_prob = ( self.model.space_dim - 1) * np.log(z) + self.model.log_prior(proposal) - self.model.log_prior(current_value)
+            log_accept_prob = ( self.model.space_dim - 1) * np.log(z) + log_function(proposal) - log_function(current_value)
             accepted = (log_accept_prob > np.log(U(0,1,size = self.nwalkers)))
 
             self.chain[t+1, accepted,:]                 = proposal[accepted]
