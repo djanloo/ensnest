@@ -147,8 +147,11 @@ def unpack_variables(x):
 
     note
     ----
-        if any of the n1, n2, -- other dimension is equal to one,
+        if any of the n1, n2, -- other dimension is equal to 1,
         it gets squeezed as it is an unnecessary nesting.
+        Indeed
+            * ``(x,y,space_dim)`` -> ``(space_dim,x,y)`` is fine
+            * ``(x,y,1)`` ~ ``(x,y)`` -> ``(x,y)`` (1D case)
 
     Args
     ----
@@ -170,5 +173,6 @@ def unpack_variables(x):
         It may be computationally expensive. Check for improvements.
     '''
     x = np.array(x)
+    # rotate the axis and remove 1 from shape
     vars = x if not x.shape else np.moveaxis(x,-1,0).squeeze()
     return vars
