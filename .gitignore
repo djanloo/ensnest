@@ -1,4 +1,6 @@
-documentation/build/
-'What i learned on sphinx'
-'git commands'
+./documentation/build/
+What_i_learned_on_sphinx
+git_commands
 old/
+__pycache__/
+articles/

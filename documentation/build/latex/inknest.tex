@@ -47,7 +47,7 @@
 \setlength{\cftsecnumwidth}{1.25cm}
 
 \title{inknest}
-\date{Aug 31, 2021}
+\date{Sep 01, 2021}
 \release{1.0}
 \author{Gianluca Becuzzi}
 \newcommand{\sphinxlogo}{\vbox{}}
@@ -225,8 +225,17 @@ Given a \sphinxcode{\sphinxupquote{np.ndarray}} of shape \sphinxcode{\sphinxupqu
 returns an unpackable array of shape \sphinxcode{\sphinxupquote{(space\_dim, n1,n2, \sphinxhyphen{}\sphinxhyphen{})}}.
 
 \begin{sphinxadmonition}{note}{Note:}
-if any of the n1, n2, – other dimension is equal to one,
+if any of the n1, n2, – other dimension is equal to 1,
 it gets squeezed as it is an unnecessary nesting.
+Indeed
+\begin{itemize}
+\item {} 
+\sphinxcode{\sphinxupquote{(x,y,space\_dim)}} \sphinxhyphen{}> \sphinxcode{\sphinxupquote{(space\_dim,x,y)}} is fine
+
+\item {} 
+\sphinxcode{\sphinxupquote{(x,y,1)}} \textasciitilde{} \sphinxcode{\sphinxupquote{(x,y)}} \sphinxhyphen{}> \sphinxcode{\sphinxupquote{(x,y)}} (1D case)
+
+\end{itemize}
 \end{sphinxadmonition}
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode
