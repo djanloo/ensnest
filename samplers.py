@@ -39,9 +39,12 @@ class Sampler:
         self.model      = model
         self.length     = mcmc_length
         self.nwalkers   = nwalkers
-        self.verbosity  = 0
+        self.verbosity  = verbosity
+        self.elapsed_time_index = 0     #'time' index up to which self.chain has been developed
 
         self.chain      = np.zeros((self.length, self.nwalkers, self.model.space_dim))
+
+        #uniform initialisation
         for walker in range(self.nwalkers):
             self.chain[0, walker, : ] = U(*self.model.bounds)
 
@@ -62,7 +65,7 @@ class AIESampler(Sampler):
 
     '''
 
-    def __init__(self, model, mcmc_length, nwalkers=10,space_scale=4, verbosity=0):
+    def __init__(self, model, mcmc_length, nwalkers=10,space_scale = 4, verbosity=0):
 
         super().__init__(model, mcmc_length, nwalkers, verbosity=verbosity)
 
@@ -80,6 +83,43 @@ class AIESampler(Sampler):
         '''
 
         return (U(0,1, size = size )*(self.space_scale**(1/2) - self.space_scale**(-1/2) ) + self.space_scale**(-1/2) )**2
+
+    def AIEStep(self, log_function):
+        '''Single step of AIESampler
+
+            Args
+            ----
+                log_function : function
+        '''
+        #considers the whole ensamble at at time
+        current_walker_index    = np.arange(self.nwalkers)
+        current_walker_position = self.chain[self.elapsed_time_index,current_walker_index, :]
+
+        #for each walker selects randomly another walker as a pivot for the stretch move
+        pivot_index     = (current_walker_index + randint(1,self.nwalkers, size = self.nwalkers)) % self.nwalkers
+        pivot_position  = self.chain[self.elapsed_time_index, pivot_index, : ]
+
+        if (pivot_index == current_walker_index).any():
+            print('pivot index is the same as current')
+            exit()
+
+        z        = self.get_stretch(size = self.nwalkers)
+        proposal = pivot_position + z[:,None] * (current_walker_position - pivot_position)
+
+        log_accept_prob = ( self.model.space_dim - 1) * np.log(z) + log_function(proposal) - log_function(current_walker_position)
+        if np.isnan(log_accept_prob).any():
+            wherenan = np.isnan(log_accept_prob)
+            print('fatal: nan acceptance probability')
+            print(f'is current inside: {self.model.is_inside_bounds(current_walker_position[wherenan])}')
+            print(f'is proposal inside: {self.model.is_inside_bounds(proposal[wherenan])}')
+            print(f'current_walker_logfunc:  {log_function(current_walker_position[wherenan])}\nproposal_logfunc: {log_function(proposal[wherenan])}')
+
+            exit()
+        accepted        = (log_accept_prob > np.log(U(0,1,size = self.nwalkers)))
+
+        self.chain[self.elapsed_time_index+1, accepted,:]                 = proposal[accepted]
+        self.chain[self.elapsed_time_index+1, np.logical_not(accepted),:] = self.chain[self.elapsed_time_index, np.logical_not(accepted), :]
+        self.elapsed_time_index += 1
 
     def sample_function(self,log_function):
         """Samples function.
@@ -110,29 +150,14 @@ class AIESampler(Sampler):
             * generate a bunch of points (say M)
             * take M worst point -> do stuff
 
+        but i don't think it is how the vanilla NS should work, because
+        nlive is variable throughout the process. Check dynamic NS.
+
         returns:
             np.ndarray : the chain obtained
         """
-        for t in trange(self.length - 1):
-
-            current_index = np.arange(self.nwalkers)
-            current_value = self.chain[t,current_index, :]
-
-            pivot_index = (current_index + randint(1,self.nwalkers, size = self.nwalkers)) % self.nwalkers
-            pivot_value = self.chain[t,pivot_index, :]
-
-            if (pivot_index == current_index).any():
-                print('pivot index is the same as current')
-                exit()
-
-            z = self.get_stretch(size = self.nwalkers)
-            proposal = pivot_value + z[:,None] * (current_value - pivot_value)
-
-            log_accept_prob = ( self.model.space_dim - 1) * np.log(z) + log_function(proposal) - log_function(current_value)
-            accepted = (log_accept_prob > np.log(U(0,1,size = self.nwalkers)))
-
-            self.chain[t+1, accepted,:]                 = proposal[accepted]
-            self.chain[t+1, np.logical_not(accepted),:] = self.chain[t, np.logical_not(accepted), :]
+        for t in range(self.length - 1):
+            self.AIEStep(log_function)
         return self
 
     def join_chains(self, burn_in = 0.02):
