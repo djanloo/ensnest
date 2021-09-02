@@ -1,8 +1,8 @@
 inknest
 =======
 
-An implementation of the DNS algorithm described in  `Brewer (2010) <https://arxiv.org/abs/0912.2380v3> _.
-The goal is to manage to use the *stretch-move-based* invariant ensemble sampler `(Goodman & Weare, 2010) <https://msp.org/camcos/2010/5-1/camcos-v5-n1-p04-p.pdf>   _ because of its ability to outperform MH-based algorithm (especially in high dimensions) and its capacity to manage discontinuos pdfs.
+An implementation of the DNS algorithm described in  `Brewer (2010) <https://arxiv.org/abs/0912.2380v3>`_.
+The goal is to manage to use the *stretch-move-based* invariant ensemble sampler `(Goodman & Weare, 2010) <https://msp.org/camcos/2010/5-1/camcos-v5-n1-p04-p.pdf>`_ because of its ability to outperform MH-based algorithm (especially in high dimensions) and its capacity to manage discontinuos pdfs.
 
 In a nutshell the purpose of this code is the management of *black-box*  user-defined problems, minimizing:
 
