@@ -11,7 +11,7 @@ from tqdm import trange
 np.seterr(divide = 'ignore')
 
 bounds = np.ones(2)
-bounds = (bounds , 50*bounds)
+bounds = (bounds*0.1 , 5*bounds)
 
 def likelihood_constraint(x,worstL):
     result = np.log((log_likelihood(x) > worstL).astype(int))
@@ -19,7 +19,7 @@ def likelihood_constraint(x,worstL):
 
 def log_prior(x):
     x1,x2 = model.unpack_variables(x)
-    return np.log(np.sin(x1))
+    return np.log(1/x1)
 
 def log_likelihood(x):
     x = model.unpack_variables(x)
@@ -27,10 +27,10 @@ def log_likelihood(x):
 
 nlive = 1000
 
-my_model = model.Model(log_prior, log_likelihood, bounds)
-init_sampler = samplers.AIESampler(my_model,10000,nwalkers = nlive, space_scale = 10)
-all_points = init_sampler.sample_function(log_prior).join_chains()
+my_model        = model.Model(log_prior, log_likelihood, bounds)
+init_sampler    = samplers.AIESampler(my_model,5000,nwalkers = nlive, space_scale = 2).sample_function(log_prior)
 
+all_points      = init_sampler.join_chains()
 plt.hist(all_points, bins = 50, histtype = 'step',  density = True)
 
 

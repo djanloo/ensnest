@@ -108,14 +108,15 @@ class AIESampler(Sampler):
 
         log_function_proposal = log_function(proposal)
         log_function_current  = log_function(current_walker_position)
-        if np.isnan(log_function_proposal).any():
-            if self.verbosity: print(f'WARNING: hit a NaN point for {log_function.__name__}. Set to -inf.')
-            log_accept_prob = -np.inf
-        elif not np.isfinite(log_function_current).all():
+
+        log_accept_prob = ( self.model.space_dim - 1) * np.log(z) + log_function_proposal - log_function_current
+
+        #if point is out of function domain, sets rejection
+        log_accept_prob[np.isnan(log_function_proposal)] = -np.inf
+
+        if not np.isfinite(log_function_current).all():
             print(f'FATAL: past point is in impossible position')
             exit()
-        else:
-            log_accept_prob = ( self.model.space_dim - 1) * np.log(z) + log_function_proposal - log_function_current
 
         accepted = (log_accept_prob > np.log(U(0,1,size = self.nwalkers)))
 
