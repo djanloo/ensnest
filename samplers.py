@@ -156,8 +156,9 @@ class AIESampler(Sampler):
         returns:
             np.ndarray : the chain obtained
         """
+        boxed_log_function = lambda x: log_function(x) + self.model.log_chi(x)
         for t in range(self.length - 1):
-            self.AIEStep(log_function)
+            self.AIEStep(boxed_log_function)
         return self
 
     def join_chains(self, burn_in = 0.02):
