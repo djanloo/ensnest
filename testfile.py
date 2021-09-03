@@ -19,7 +19,7 @@ def likelihood_constraint(x,worstL):
 
 def log_prior(x):
     x1,x2 = model.unpack_variables(x)
-    return 1/x1
+    return np.log(np.sin(x1))
 
 def log_likelihood(x):
     x = model.unpack_variables(x)
@@ -28,7 +28,7 @@ def log_likelihood(x):
 nlive = 1000
 
 my_model = model.Model(log_prior, log_likelihood, bounds)
-init_sampler = samplers.AIESampler(my_model,500,nwalkers = nlive, space_scale = 10)
+init_sampler = samplers.AIESampler(my_model,10000,nwalkers = nlive, space_scale = 10)
 all_points = init_sampler.sample_function(log_prior).join_chains()
 
 plt.hist(all_points, bins = 50, histtype = 'step',  density = True)

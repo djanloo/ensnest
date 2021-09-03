@@ -106,16 +106,18 @@ class AIESampler(Sampler):
         z        = self.get_stretch(size = self.nwalkers)
         proposal = pivot_position + z[:,None] * (current_walker_position - pivot_position)
 
-        log_accept_prob = ( self.model.space_dim - 1) * np.log(z) + log_function(proposal) - log_function(current_walker_position)
-        if np.isnan(log_accept_prob).any():
-            wherenan = np.isnan(log_accept_prob)
-            print('fatal: nan acceptance probability')
-            print(f'is current inside: {self.model.is_inside_bounds(current_walker_position[wherenan])}')
-            print(f'is proposal inside: {self.model.is_inside_bounds(proposal[wherenan])}')
-            print(f'current_walker_logfunc:  {log_function(current_walker_position[wherenan])}\nproposal_logfunc: {log_function(proposal[wherenan])}')
-
+        log_function_proposal = log_function(proposal)
+        log_function_current  = log_function(current_walker_position)
+        if np.isnan(log_function_proposal).any():
+            if self.verbosity: print(f'WARNING: hit a NaN point for {log_function.__name__}. Set to -inf.')
+            log_accept_prob = -np.inf
+        elif not np.isfinite(log_function_current).all():
+            print(f'FATAL: past point is in impossible position')
             exit()
-        accepted        = (log_accept_prob > np.log(U(0,1,size = self.nwalkers)))
+        else:
+            log_accept_prob = ( self.model.space_dim - 1) * np.log(z) + log_function_proposal - log_function_current
+
+        accepted = (log_accept_prob > np.log(U(0,1,size = self.nwalkers)))
 
         self.chain[self.elapsed_time_index+1, accepted,:]                 = proposal[accepted]
         self.chain[self.elapsed_time_index+1, np.logical_not(accepted),:] = self.chain[self.elapsed_time_index, np.logical_not(accepted), :]
@@ -157,7 +159,7 @@ class AIESampler(Sampler):
             np.ndarray : the chain obtained
         """
         boxed_log_function = lambda x: log_function(x) + self.model.log_chi(x)
-        for t in range(self.length - 1):
+        for t in trange(self.length - 1):
             self.AIEStep(boxed_log_function)
         return self
 
