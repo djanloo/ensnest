@@ -1,8 +1,0 @@
-Generated code description
-==========================
-
-Code description generated automatically from docstrings.
-
- .. automodule:: Samplers
- 	:special-members: __init__
- 	:members:
