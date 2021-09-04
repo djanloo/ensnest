@@ -65,7 +65,7 @@ class AIESampler(Sampler):
 
     '''
 
-    def __init__(self, model, mcmc_length, nwalkers=10,space_scale = 4, verbosity=0):
+    def __init__(self, model, mcmc_length, nwalkers=10, space_scale = 4, verbosity=0):
 
         super().__init__(model, mcmc_length, nwalkers, verbosity=verbosity)
 
@@ -163,6 +163,64 @@ class AIESampler(Sampler):
         for t in trange(self.length - 1):
             self.AIEStep(boxed_log_function)
         return self
+
+    def likelihood_constraint(self,x,worstL):
+        result = np.log((self.model.log_likelihood(x) > worstL).astype(int))
+        return result
+
+    def sample_over_threshold(self,Lmin):
+        '''Performs likelihood-constrained prior sampling.
+
+        The NS algorithm starts with a set :math:`{\theta_i}` of points distributed as :math:`\pi(\theta)`
+
+        After excluding the worst (:math:`L_{w}`), a new point of likelihood greater than :math:`L_{w}`
+        has to be generated. One has freedom to choose the way this new point is yielded,
+        as long as the new point has pdf:
+
+            .. math::
+                p(\theta_{new}) d\theta_{new} = \pi(\theta_{new}) (L(\theta_{new}) > L_w)
+                p(\theta_{new}) d\theta_{new} = 0                 (L(\theta_{new}) > L_w)
+
+        This function uses the AIE sampler on the current live points (nlive -1) and
+        evolves them in the likelihood-constrained prior to generate other (nlive - 1)
+        points, then takes one at random.
+
+        Furthermore, the newly generated point is forced to have likelihood different from all the initial ones.
+
+        note
+        ----
+            (at the moment) sampler has to be initialised
+
+            To solve: conflict nlive -> nlive - 1
+        '''
+        LCprior = lambda x: self.model.log_prior(x) + self.likelihood_constraint(x, Lmin)
+
+        #TODO: this line costs a lot of lik-evaluation. solve
+        initial_log_likelihoods = self.model.log_likelihood(self.chain[0])
+
+        #generates nlive - 1 points over L>Lmin
+        for t in range(self.length - 1):
+            self.AIEStep(LCprior)
+        '''
+        #selects one of this point give it's different from the given ones
+        is_duplicate    = (self.model.log_likelihood(self.chain[self.elapsed_time_index]) == initial_log_likelihoods[:,None]).any(axis = 0)
+        n_duplicate     = np.sum(is_duplicate.astype(int))
+
+        if is_duplicate.any(): print(f'>>>>>>>>>>> WARNING: {n_duplicate} duplicate(s) found')
+
+        correct_ones = self.chain[self.elapsed_time_index, np.logical_not(is_duplicate), :]
+        new_point    = correct_ones[np.random.randint(self.nwalkers - n_duplicate), :]
+        return new_point
+        '''
+        ###############  reduce reduction test ############
+        correct_ones = self.chain[self.elapsed_time_index, :, :]
+        new_point    = correct_ones[np.random.randint(self.nwalkers), :]
+        return new_point
+
+    def reset(self):
+        self.elapsed_time_index = 0
+        self.chain = np.zeros((self.length, self.nwalkers, self.model.space_dim))
+
 
     def join_chains(self, burn_in = 0.02):
         '''Joins the chains for the ensemble after removing  ``burn_in`` \% of each single_particle chain.
