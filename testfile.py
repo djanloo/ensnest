@@ -18,6 +18,7 @@ def log_prior(x):
     x1,x2 = model.unpack_variables(x)
     return np.log(1/x1)
 
+
 def log_likelihood(x):
     x = model.unpack_variables(x)
     return -0.5*np.sum((x - 2)**2,axis = 0)
@@ -68,7 +69,6 @@ for i in trange(0, npoints):
     evo_sampler.reset()
 
 plt.scatter(sample_over[:,0], sample_over[:,1],alpha = 0.5)
-
 
 
 plt.show()
