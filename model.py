@@ -19,7 +19,7 @@ class Model:
         The log_prior and logg_likelihood functions are user defined and must have **one argument only**.
 
         They also must be capable of managing (\*,\*, .., space_dimension )-shaped arrays,
-        so make sure every operation is done on the **-1 axis of input**.
+        so make sure every operation is done on the **-1 axis of input** or use ``Model.unpack_variables()``.
 
         If input is a single point of shape (space_dimension,) both the functions
         must return a float ( not a (1,)-shaped array )
@@ -36,7 +36,7 @@ class Model:
         self.bounds          = space_bounds
 
         self.log_prior       = lambda x: log_prior(x)       + self.log_chi(x)
-        self.log_likelihood  = lambda x: log_likelihood(x)  + self.log_chi(x)
+        self.log_likelihood  = lambda x: log_likelihood(x)
 
         try:
             self.space_dim   = space_bounds[0].shape[0]
