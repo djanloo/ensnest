@@ -84,6 +84,7 @@ class AIESampler(Sampler):
 
         return (U(0,1, size = size )*(self.space_scale**(1/2) - self.space_scale**(-1/2) ) + self.space_scale**(-1/2) )**2
 
+    @profile
     def AIEStep(self, log_function):
         '''Single step of AIESampler
 
@@ -95,8 +96,12 @@ class AIESampler(Sampler):
         current_walker_index    = np.arange(self.nwalkers)
         current_walker_position = self.chain[self.elapsed_time_index,current_walker_index, :]
 
+        #OPTIMIZATION: np.random.randint is really slow
+        #generate a number from 1 to self.nwalkers-1
+        delta_index = ((self.nwalkers-2)*np.random.rand(self.nwalkers)+1).astype(int)
+
         #for each walker selects randomly another walker as a pivot for the stretch move
-        pivot_index     = (current_walker_index + randint(1,self.nwalkers, size = self.nwalkers)) % self.nwalkers
+        pivot_index     = (current_walker_index + delta_index   ) % self.nwalkers
         pivot_position  = self.chain[self.elapsed_time_index, pivot_index, : ]
 
         if (pivot_index == current_walker_index).any():
@@ -159,15 +164,15 @@ class AIESampler(Sampler):
         returns:
             np.ndarray : the chain obtained
         """
-        boxed_log_function = lambda x: log_function(x) + self.model.log_chi(x)
         for t in trange(self.length - 1):
-            self.AIEStep(boxed_log_function)
+            self.AIEStep(log_function)
         return self
 
     def likelihood_constraint(self,x,worstL):
         result = np.log((self.model.log_likelihood(x) > worstL).astype(int))
         return result
 
+    @profile
     def sample_over_threshold(self,Lmin):
         '''Performs likelihood-constrained prior sampling.
 
