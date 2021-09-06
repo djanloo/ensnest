@@ -189,19 +189,22 @@ class AIESampler(Sampler):
 
         note
         ----
-            (at the moment) sampler has to be initialised
+            (at the moment) sampler has to be initialised to points already inside bounds
 
             To solve: conflict nlive -> nlive - 1
         '''
         LCprior = lambda x: self.model.log_prior(x) + self.likelihood_constraint(x, Lmin)
 
+        if not np.isfinite(LCprior(self.chain[self.elapsed_time_index])).all():
+            print('WARNING: at least one point is out of L-bounds')
+
         #TODO: this line costs a lot of lik-evaluation. solve
-        initial_log_likelihoods = self.model.log_likelihood(self.chain[0])
+        initial_log_likelihoods = self.model.log_likelihood(self.chain[self.elapsed_time_index])
 
         #generates nlive - 1 points over L>Lmin
         for t in range(self.length - 1):
             self.AIEStep(LCprior)
-        '''
+
         #selects one of this point give it's different from the given ones
         is_duplicate    = (self.model.log_likelihood(self.chain[self.elapsed_time_index]) == initial_log_likelihoods[:,None]).any(axis = 0)
         n_duplicate     = np.sum(is_duplicate.astype(int))
@@ -210,11 +213,6 @@ class AIESampler(Sampler):
 
         correct_ones = self.chain[self.elapsed_time_index, np.logical_not(is_duplicate), :]
         new_point    = correct_ones[np.random.randint(self.nwalkers - n_duplicate), :]
-        return new_point
-        '''
-        ###############  reduce reduction test ############
-        correct_ones = self.chain[self.elapsed_time_index, :, :]
-        new_point    = correct_ones[np.random.randint(self.nwalkers), :]
         return new_point
 
     def reset(self):
