@@ -25,25 +25,32 @@ class Model:
         must return a float ( not a (1,)-shaped array )
 
     '''
-    def __init__(self, log_prior, log_likelihood, space_bounds):
-        '''Initialise the sampler.
-
-        By default the starting point of the markov chain are uniformly distributed over all space.
+    def __init__(self):
+        '''Checks the model.
         '''
-        space_bounds = (np.array(space_bounds[0]).astype(float), np.array(space_bounds[1]).astype(float))
-        assert space_bounds[0].shape == space_bounds[1].shape, "Uncoherent space dimensions"
-
-        self.bounds          = space_bounds
-
-        self.log_prior       = lambda x: log_prior(x)       + self.log_chi(x)
-        self.log_likelihood  = lambda x: log_likelihood(x)
+        self.bounds = (np.array(self.bounds[0]).astype(float), np.array(self.bounds[1]).astype(float))
 
         try:
-            self.space_dim   = space_bounds[0].shape[0]
+
+            dim1 = self.bounds[0].shape[0]
+            dim2 = self.bounds[1].shape[0]
+            if dim1 == dim2:
+                self.space_dim = dim1
+            else:
+                print('Different space dimensions in bounds')
+                exit()
+
         except IndexError: #in case bounds is given of the form (n,m)
             self.space_dim   = 1
 
+
         self._check()
+
+    def log_likelihood(self,x):
+        pass
+
+    def log_prior(self, x):
+        pass
 
     def _check(self):
         '''Checks if log_prior and log_likelihood are well behaved in return shape
@@ -137,6 +144,33 @@ class Model:
         """ ``self`` shorthand for ``utils.pointshape(x, dim = self.space_dim)``
         """
         return utils.pointshape(x, dim = self.space_dim)
+
+
+    def auto_bound(log_func):
+        '''Decorator to bound functions.
+
+        args
+        ----
+            log_func : function
+                A function for which ``self.log_func(x)`` is valid.
+
+        Returns:
+            function : the bounded function ``log_func(x) + log_chi(x)``
+
+        Example
+        -------
+
+            >>> class MyModel(model.Model):
+            >>>
+            >>>     @model.Model.auto_bound
+            >>>     def log_prior(x):
+            >>>         return x
+
+
+        '''
+        def _autobound_wrapper(self,*args):
+            return log_func(self,*args) + self.log_chi(*args)
+        return _autobound_wrapper
 
 
 def unpack_variables(x):
