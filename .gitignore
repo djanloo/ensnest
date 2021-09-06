@@ -136,3 +136,4 @@ __pycache__/
 old/
 articles/
 documentation/build/*
+!documenation/build/latex/inknest.pdf
