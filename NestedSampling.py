@@ -1,5 +1,4 @@
 import numpy as np
-import samplers
 import model
 import test
 from utils  import *
@@ -7,6 +6,10 @@ from matplotlib import pyplot as plt
 from numpy.random import uniform as U
 from bisect import bisect_left
 from tqdm import trange
+
+import pyximport; pyximport.install()
+import cy_samplers
+
 
 np.seterr(divide = 'ignore')
 
@@ -22,15 +25,14 @@ class MyModel(model.Model):
     def log_likelihood(self,x):
         return -0.5*np.sum(x**2,axis = -1)
 
-@profile
 def main():
     my_model = MyModel()
     nlive = 100
-    npoints = 100
+    npoints = 1000
 
 
     #initialisation of the first nlive points and sorting
-    points = samplers.AIESampler(my_model, 100, nwalkers=nlive ).sample_function(my_model.log_prior).chain[99]
+    points = cy_samplers.AIESampler(my_model, 100, nwalkers=nlive ).sample_function(my_model.log_prior).chain[99]
     logLs  = my_model.log_likelihood(points)
 
     points  = points[np.argsort(logLs)]
@@ -38,7 +40,7 @@ def main():
 
 
     #initialise evolver sampler
-    evolve_sampler = samplers.AIESampler(my_model, 70 ,nwalkers=nlive-1)
+    evolve_sampler = cy_samplers.AIESampler(my_model, 70 ,nwalkers=nlive-1)
 
     for n_generated in trange(npoints):
 
