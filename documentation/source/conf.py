@@ -75,3 +75,17 @@ latex_elements = {
      'extraclassoptions': 'openany,oneside'
 }
 latex_show_urls = 'footnote'
+
+#added because of the raise of ones * int error
+class Mock(mock.MagicMock):
+    @classmethod
+    def __getattr__(cls, name):
+        return Mock()
+    def __mul__(self, other):
+        return Mock()
+    def __rmul__(self, other):
+        return Mock()
+    def __pow__(self, other):
+        return Mock()
+    def __div__(self, other):
+        return Mock()
