@@ -10,25 +10,27 @@ from tqdm import trange
 
 np.seterr(divide = 'ignore')
 
-bounds = np.ones(2)
-bounds = (bounds*0.1 , 5*bounds)
+class MyModel(model.Model):
+    def __init__(self):
+        bounds = np.ones(2)
+        self.bounds = (bounds*0.1 , 5*bounds)
+        super().__init__()
 
+    def log_prior(self,x):
+        x1,x2 = model.unpack_variables(x)
+        return np.log(1/x1)
 
-def log_prior(x):
-    x1,x2 = model.unpack_variables(x)
-    return np.log(1/x1)
-
-def log_likelihood(x):
-    x = model.unpack_variables(x)
-    return -0.5*np.sum((x - 2)**2,axis = 0)
+    def log_likelihood(self,x):
+        x = model.unpack_variables(x)
+        return -0.5*np.sum((x - 2)**2,axis = 0)
 
 nlive = 100
 npoints = 100
 
-my_model  = model.Model(log_prior, log_likelihood, bounds)
+my_model  = MyModel()
 
-points = samplers.AIESampler(my_model, 100, nwalkers=nlive ).sample_function(log_prior).chain[99]
-logLs  = log_likelihood(points)
+points = samplers.AIESampler(my_model, 100, nwalkers=nlive ).sample_function(my_model.log_prior).chain[99]
+logLs  = my_model.log_likelihood(points)
 
 points  = points[np.argsort(logLs)]
 logLs   = np.sort(logLs)
@@ -43,8 +45,8 @@ for n_generated in trange(npoints):
     new_point = evo_sampler.sample_over_threshold(logLs[n_generated])
 
     #inserts the point in the right place of the ordered list
-    replace_index = bisect_left(logLs, log_likelihood(new_point))
-    logLs         = np.insert(logLs, replace_index , log_likelihood(new_point))
+    replace_index = bisect_left(logLs, my_model.log_likelihood(new_point))
+    logLs         = np.insert(logLs, replace_index , my_model.log_likelihood(new_point))
     points        = np.insert(points,  replace_index,  new_point, axis = 0)
 
     #reset the sampler
