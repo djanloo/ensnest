@@ -137,3 +137,4 @@ old/
 articles/
 documentation/build/*
 !*/inknest.pdf
+*omit.*
