@@ -24,6 +24,7 @@ class MyModel(model.Model):
         x = model.unpack_variables(x)
         return -0.5*np.sum((x - 2)**2,axis = 0)
 
+
 nlive = 100
 npoints = 100
 
@@ -70,7 +71,6 @@ for i in trange(0, npoints):
     evo_sampler.reset()
 
 plt.scatter(sample_over[:,0], sample_over[:,1],alpha = 0.5)
-
 
 
 plt.show()
