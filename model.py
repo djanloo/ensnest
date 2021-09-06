@@ -145,7 +145,7 @@ class Model:
         """
         return utils.pointshape(x, dim = self.space_dim)
 
-
+    @profile
     def auto_bound(log_func):
         '''Decorator to bound functions.
 
@@ -172,7 +172,7 @@ class Model:
             return log_func(self,*args) + self.log_chi(*args)
         return _autobound_wrapper
 
-
+@profile
 def unpack_variables(x):
     '''Helper function that performs values shapecasting.
 
