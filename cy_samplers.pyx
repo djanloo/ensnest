@@ -9,13 +9,25 @@ Each sampler shoud be capable of tackling with discontinuous functions.
 Since is intended to be used in nested sampling, each sampler should support likelihood constrained prior sampling (LCPS).
 
 """
+# cython: language_level=3
+import cython
 cimport cython
 import numpy as np
 cimport numpy as np
+
 from numpy.random import uniform as U
-from numpy.random import randint
 import model
 from tqdm import tqdm, trange
+
+from libc.stdlib cimport rand
+cdef extern from "limits.h":
+    int INT_MAX
+cdef float randnum():
+  return rand() / float(INT_MAX)
+
+cdef int c_randint(int n):
+  return rand()%n
+
 
 class Sampler:
     """Produces samples from model.
@@ -81,6 +93,10 @@ class AIESampler(Sampler):
 
         Output is distibuted as :math:`\\frac{1}{\\sqrt{z}}`  in :math:`[1/a,a]``.
         Uses inverse transform sampling
+
+        warning
+        -------
+            In ``cython`` version is deprecated.
         '''
 
         return (U(0,1, size = size )*(self.space_scale**(1/2) - self.space_scale**(-1/2) ) + self.space_scale**(-1/2) )**2
@@ -92,52 +108,56 @@ class AIESampler(Sampler):
             ----
                 log_function : function
         '''
-        cdef np.ndarray current_walker_index  = np.zeros((self.nwalkers,),    dtype = np.int)
-        cdef np.ndarray delta_index           = np.zeros((self.nwalkers,),    dtype = np.int)
-        cdef np.ndarray pivot_index           = np.zeros((self.nwalkers,),    dtype = np.int)
-        cdef np.ndarray z                     = np.zeros((self.nwalkers,),    dtype = np.float64)
-        cdef np.ndarray proposal              = np.zeros((self.nwalkers,),    dtype = np.float64)
-        cdef np.ndarray log_accept_prob       = np.zeros((self.nwalkers,),    dtype = np.float64)
-        cdef np.ndarray accepted              = np.zeros((self.nwalkers,) ,   dtype = np.bool)
-        cdef np.ndarray current_walker_position = np.zeros((self.nwalkers,),  dtype=np.float64)
-        cdef np.ndarray pivot_position        = np.zeros((self.nwalkers,),    dtype=np.float64)
+        cdef:
+          int nwalkers      = self.nwalkers
+          int time_index    = self.elapsed_time_index
+          int space_dim     = self.model.space_dim
+          float space_scale = self.space_scale
+          #probably must be changed the structure od points for 1-D situations (ndim=2)
+          np.ndarray[np.float64_t, ndim=2] current_chain = self.chain[time_index]
 
+        cdef np.ndarray[np.float64_t] current_walker_position
+        cdef np.ndarray[np.float64_t] pivot_position
 
-        #considers the whole ensamble at at time
-        current_walker_index    = np.arange(self.nwalkers, dtype=np.int)
-        current_walker_position = self.chain[self.elapsed_time_index,current_walker_index, :]
+        cdef int current_index, pivot_index
+        cdef float z, log_accept_prob, proposal_position, log_function_proposal,log_function_current
 
-        #OPTIMIZATION: np.random.randint is really slow
-        #generate a number from 1 to self.nwalkers-1
-        delta_index = ((self.nwalkers-2)*np.random.rand(self.nwalkers)+1).astype(int)
+        #since it is cythonized, indexing instead of iteration
+        #in other tests cython is faster even than numpy multiplications/sums
+        for current_index in range(nwalkers):
 
-        #for each walker selects randomly another walker as a pivot for the stretch move
-        pivot_index     = (current_walker_index + delta_index   ) % self.nwalkers
-        pivot_position  = self.chain[self.elapsed_time_index, pivot_index, : ]
+          current_walker_position = self.chain[time_index,current_index, :]
 
-        if (pivot_index == current_walker_index).any():
-            print('pivot index is the same as current')
+          #selects a random walker in the complementary ensemble as a pivot
+          pivot_index     = (current_index + 1 + c_randint(nwalkers-1))%nwalkers
+          pivot_position  = current_chain[pivot_index]
+
+          if pivot_index == current_index:
+              print('FATAL: pivot index is the same as current')
+              exit()
+
+          #the 1/sqrt(z) distributed random stretch. See (dep) get_stretch()
+          z        = (randnum()*(space_scale**(1/2) - space_scale**(-1/2) ) + space_scale**(-1/2) )**2
+          proposal = pivot_position + z*(current_walker_position - pivot_position)
+
+          log_function_proposal = log_function(proposal)
+          log_function_current  = log_function(current_walker_position)
+          #print(f'current {current_index} has log_func{log_function_current}')
+          #checks that every current point is inside an accessible region
+          if log_function_current == -np.inf:
+            print("FATAL: current point of chain is in impossible region")
             exit()
 
-        z        = self.get_stretch(size = self.nwalkers)
-        proposal = pivot_position + z[:,None] * (current_walker_position - pivot_position)
+          log_accept_prob = ( space_dim - 1) * np.log(z) + log_function_proposal - log_function_current
 
-        log_function_proposal = log_function(proposal)
-        log_function_current  = log_function(current_walker_position)
+          #if point is out of function domain, sets rejection withoun MH accept
+          if log_function_proposal != np.nan:
 
-        log_accept_prob = ( self.model.space_dim - 1) * np.log(z) + log_function_proposal - log_function_current
+            if log_accept_prob > np.log(randnum()):
+              self.chain[time_index+1, current_index, :] = proposal
+          else:
+            self.chain[time_index+1, current_index, :] = current_chain[current_index,:]
 
-        #if point is out of function domain, sets rejection
-        log_accept_prob[np.isnan(log_function_proposal)] = -np.inf
-
-        if not np.isfinite(log_function_current).all():
-            print(f'FATAL: past point is in impossible position')
-            exit()
-
-        accepted = (log_accept_prob > np.log(U(0,1,size = self.nwalkers)))
-
-        self.chain[self.elapsed_time_index+1, accepted,:]                 = proposal[accepted]
-        self.chain[self.elapsed_time_index+1, np.logical_not(accepted),:] = self.chain[self.elapsed_time_index, np.logical_not(accepted), :]
         self.elapsed_time_index += 1
 
     def sample_function(self,log_function):
