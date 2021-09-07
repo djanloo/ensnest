@@ -29,7 +29,7 @@ class MyModel(model.Model):
 def main():
     my_model = MyModel()
     nlive = 100
-    npoints = 1000
+    npoints = 10
 
 
     #initialisation of the first nlive points and sorting
@@ -55,10 +55,3 @@ def main():
 
         #reset the sampler
         evolve_sampler.reset()
-
-profiler = cProfile.Profile()
-profiler.enable()
-main()
-profiler.disable()
-stats = pstats.Stats(profiler).sort_stats('tottime')
-stats.print_stats()

@@ -10,14 +10,17 @@ Since is intended to be used in nested sampling, each sampler should support lik
 
 """
 # cython: language_level=3
+# cython: binding=True
+# distutils: define_macros=CYTHON_TRACE_NOGIL=1
+
 import cython
 cimport cython
 import numpy as np
 cimport numpy as np
-
 from numpy.random import uniform as U
 import model
 from tqdm import tqdm, trange
+from sys import exit
 
 from libc.stdlib cimport rand
 from libc.math cimport sqrt
@@ -104,6 +107,8 @@ class AIESampler(Sampler):
 
         return (U(0,1, size = size )*(self.space_scale**(1/2) - self.space_scale**(-1/2) ) + self.space_scale**(-1/2) )**2
 
+    @cython.wraparound(False)
+    @cython.boundscheck(False)
     def AIEStep(self, log_function):
         '''Single step of AIESampler
 
@@ -125,11 +130,12 @@ class AIESampler(Sampler):
         cdef int current_index, pivot_index
         cdef float z, log_accept_prob, proposal_position, log_function_proposal,log_function_current
 
+        cdef int zerocount = 0
         #since it is cythonized, indexing instead of iteration
         #in other tests cython is faster even than numpy multiplications/sums
-        for current_index in range(nwalkers):
 
-          current_walker_position = self.chain[time_index,current_index, :]
+        for current_index in range(nwalkers):
+          current_walker_position = current_chain[current_index].copy()
 
           #selects a random walker in the complementary ensemble as a pivot
           pivot_index     = (current_index + 1 + c_randint(nwalkers-1))%nwalkers
@@ -155,12 +161,12 @@ class AIESampler(Sampler):
 
           #if point is out of function domain, sets rejection withoun MH accept
           if log_function_proposal != np.nan:
-
             if log_accept_prob > np.log(randnum()):
-              self.chain[time_index+1, current_index, :] = proposal
-              #print(f'accepted {proposal}')
+              self.chain[time_index+1, current_index, :] = proposal.copy()
+            else:
+              self.chain[time_index+1, current_index, :] = current_chain[current_index,:].copy()
           else:
-            self.chain[time_index+1, current_index, :] = current_chain[current_index,:]
+            self.chain[time_index+1, current_index, :] = current_chain[current_index,:].copy()
 
         self.elapsed_time_index += 1
 
