@@ -84,7 +84,6 @@ class AIESampler(Sampler):
 
         return (U(0,1, size = size )*(self.space_scale**(1/2) - self.space_scale**(-1/2) ) + self.space_scale**(-1/2) )**2
 
-    @profile
     def AIEStep(self, log_function):
         '''Single step of AIESampler
 
@@ -172,7 +171,6 @@ class AIESampler(Sampler):
         result = np.log((self.model.log_likelihood(x) > worstL).astype(int))
         return result
 
-    @profile
     def sample_over_threshold(self,Lmin):
         '''Performs likelihood-constrained prior sampling.
 

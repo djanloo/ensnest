@@ -10,6 +10,7 @@ from tqdm import trange
 import pyximport; pyximport.install()
 import cy_samplers
 
+import cProfile, pstats
 
 np.seterr(divide = 'ignore')
 
@@ -55,4 +56,9 @@ def main():
         #reset the sampler
         evolve_sampler.reset()
 
+profiler = cProfile.Profile()
+profiler.enable()
 main()
+profiler.disable()
+stats = pstats.Stats(profiler).sort_stats('tottime')
+stats.print_stats()

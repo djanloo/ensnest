@@ -9,7 +9,7 @@ Each sampler shoud be capable of tackling with discontinuous functions.
 Since is intended to be used in nested sampling, each sampler should support likelihood constrained prior sampling (LCPS).
 
 """
-import cython
+cimport cython
 import numpy as np
 cimport numpy as np
 from numpy.random import uniform as U
@@ -43,7 +43,7 @@ class Sampler:
         self.verbosity  = verbosity
         self.elapsed_time_index = 0     #'time' index up to which self.chain has been developed
 
-        self.chain      = np.zeros((self.length, self.nwalkers, self.model.space_dim))
+        self.chain      = np.zeros((self.length, self.nwalkers, self.model.space_dim) , dtype=np.float64)
 
         #uniform initialisation
         for walker in range(self.nwalkers):
@@ -92,19 +92,19 @@ class AIESampler(Sampler):
             ----
                 log_function : function
         '''
-        cdef np.ndarray current_walker_index  = np.zeros((self.nwalkers,), dtype = np.int)
-        cdef np.ndarray delta_index           = np.zeros((self.nwalkers,), dtype = np.int)
-        cdef np.ndarray pivot_index           = np.zeros((self.nwalkers,), dtype = np.int)
-        cdef np.ndarray z                     = np.zeros((self.nwalkers,), dtype = np.float64)
-        cdef np.ndarray proposal              = np.zeros((self.nwalkers,), dtype = np.float64)
-        cdef np.ndarray log_accept_prob       = np.zeros((self.nwalkers,), dtype = np.float64)
-        cdef np.ndarray accepted              = np.zeros((self.nwalkers,) , dtype = np.bool)
-        cdef np.ndarray current_walker_position = np.zeros((self.nwalkers,), dtype=np.float64)
-        cdef np.ndarray pivot_position        = np.zeros((self.nwalkers,), dtype=np.float64)
+        cdef np.ndarray current_walker_index  = np.zeros((self.nwalkers,),    dtype = np.int)
+        cdef np.ndarray delta_index           = np.zeros((self.nwalkers,),    dtype = np.int)
+        cdef np.ndarray pivot_index           = np.zeros((self.nwalkers,),    dtype = np.int)
+        cdef np.ndarray z                     = np.zeros((self.nwalkers,),    dtype = np.float64)
+        cdef np.ndarray proposal              = np.zeros((self.nwalkers,),    dtype = np.float64)
+        cdef np.ndarray log_accept_prob       = np.zeros((self.nwalkers,),    dtype = np.float64)
+        cdef np.ndarray accepted              = np.zeros((self.nwalkers,) ,   dtype = np.bool)
+        cdef np.ndarray current_walker_position = np.zeros((self.nwalkers,),  dtype=np.float64)
+        cdef np.ndarray pivot_position        = np.zeros((self.nwalkers,),    dtype=np.float64)
 
 
         #considers the whole ensamble at at time
-        current_walker_index    = np.arange(self.nwalkers)
+        current_walker_index    = np.arange(self.nwalkers, dtype=np.int)
         current_walker_position = self.chain[self.elapsed_time_index,current_walker_index, :]
 
         #OPTIMIZATION: np.random.randint is really slow
