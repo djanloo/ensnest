@@ -20,8 +20,11 @@ import model
 from tqdm import tqdm, trange
 
 from libc.stdlib cimport rand
+from libc.math cimport sqrt
+
 cdef extern from "limits.h":
     int INT_MAX
+
 cdef float randnum():
   return rand() / float(INT_MAX)
 
@@ -137,7 +140,7 @@ class AIESampler(Sampler):
               exit()
 
           #the 1/sqrt(z) distributed random stretch. See (dep) get_stretch()
-          z        = (randnum()*(space_scale**(1/2) - space_scale**(-1/2) ) + space_scale**(-1/2) )**2
+          z        = (randnum()*( sqrt(space_scale) - sqrt(1/space_scale)) + sqrt(1/space_scale) )**2
           proposal = pivot_position + z*(current_walker_position - pivot_position)
 
           log_function_proposal = log_function(proposal)
@@ -155,6 +158,7 @@ class AIESampler(Sampler):
 
             if log_accept_prob > np.log(randnum()):
               self.chain[time_index+1, current_index, :] = proposal
+              #print(f'accepted {proposal}')
           else:
             self.chain[time_index+1, current_index, :] = current_chain[current_index,:]
 
@@ -232,6 +236,7 @@ class AIESampler(Sampler):
 
         if not np.isfinite(LCprior(self.chain[self.elapsed_time_index])).all():
             print('WARNING: at least one point is out of L-bounds')
+            print(LCprior(self.chain[self.elapsed_time_index]))
 
         #TODO: this line costs a lot of lik-evaluation. solve
         initial_log_likelihoods = self.model.log_likelihood(self.chain[self.elapsed_time_index])
