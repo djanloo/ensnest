@@ -10,9 +10,6 @@ Since is intended to be used in nested sampling, each sampler should support lik
 
 """
 # cython: language_level=3
-# cython: binding=True
-# distutils: define_macros=CYTHON_TRACE_NOGIL=1
-
 import cython
 cimport cython
 import numpy as np
@@ -23,7 +20,7 @@ from tqdm import tqdm, trange
 from sys import exit
 
 from libc.stdlib cimport rand
-from libc.math cimport sqrt
+from libc.math cimport sqrt,log
 
 cdef extern from "limits.h":
     int INT_MAX
@@ -107,6 +104,7 @@ class AIESampler(Sampler):
 
         return (U(0,1, size = size )*(self.space_scale**(1/2) - self.space_scale**(-1/2) ) + self.space_scale**(-1/2) )**2
 
+
     @cython.wraparound(False)
     @cython.boundscheck(False)
     def AIEStep(self, log_function):
@@ -123,14 +121,15 @@ class AIESampler(Sampler):
           float space_scale = self.space_scale
           #probably must be changed the structure od points for 1-D situations (ndim=2)
           np.ndarray[np.float64_t, ndim=2] current_chain = self.chain[time_index]
-
-        cdef np.ndarray[np.float64_t] current_walker_position
-        cdef np.ndarray[np.float64_t] pivot_position
+          np.ndarray[np.float64_t, ndim=1] pivot_position           =np.zeros(space_dim, dtype=np.float64)
+          np.ndarray[np.float64_t, ndim=1] proposal_position        =np.zeros(space_dim, dtype=np.float64)
+          np.ndarray[np.float64_t, ndim=1] current_walker_position  =np.zeros(space_dim, dtype=np.float64)
 
         cdef int current_index, pivot_index
-        cdef float z, log_accept_prob, proposal_position, log_function_proposal,log_function_current
+        cdef float z, log_accept_prob, log_function_proposal,log_function_current
 
-        cdef int zerocount = 0
+        cdef int i
+        cdef list iterate_on_dimension = range(space_dim)
         #since it is cythonized, indexing instead of iteration
         #in other tests cython is faster even than numpy multiplications/sums
 
@@ -147,9 +146,11 @@ class AIESampler(Sampler):
 
           #the 1/sqrt(z) distributed random stretch. See (dep) get_stretch()
           z        = (randnum()*( sqrt(space_scale) - sqrt(1/space_scale)) + sqrt(1/space_scale) )**2
-          proposal = pivot_position + z*(current_walker_position - pivot_position)
 
-          log_function_proposal = log_function(proposal)
+          for i in range(space_dim):
+            proposal_position[i] = pivot_position[i] + z*(current_walker_position[i] - pivot_position[i])
+
+          log_function_proposal = log_function(proposal_position)
           log_function_current  = log_function(current_walker_position)
           #print(f'current {current_index} has log_func{log_function_current}')
           #checks that every current point is inside an accessible region
@@ -157,18 +158,23 @@ class AIESampler(Sampler):
             print("FATAL: current point of chain is in impossible region")
             exit()
 
-          log_accept_prob = ( space_dim - 1) * np.log(z) + log_function_proposal - log_function_current
+          log_accept_prob = ( space_dim - 1) * log(z) + log_function_proposal - log_function_current
 
           #if point is out of function domain, sets rejection withoun MH accept
           if log_function_proposal != np.nan:
-            if log_accept_prob > np.log(randnum()):
-              self.chain[time_index+1, current_index, :] = proposal.copy()
+            if log_accept_prob > log(randnum()):
+              for i in iterate_on_dimension:
+                self.chain[time_index+1, current_index, i] = proposal_position[i]
             else:
               self.chain[time_index+1, current_index, :] = current_chain[current_index,:].copy()
           else:
             self.chain[time_index+1, current_index, :] = current_chain[current_index,:].copy()
 
         self.elapsed_time_index += 1
+        return
+
+    def dummy(x):
+      return x
 
     def sample_function(self,log_function):
         """Samples function.
