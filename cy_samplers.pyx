@@ -10,6 +10,7 @@ Since is intended to be used in nested sampling, each sampler should support lik
 
 """
 # cython: language_level=3
+#cython: boundscheck=False, wraparound=False, nonecheck=False
 import cython
 cimport cython
 import numpy as np
@@ -19,11 +20,8 @@ import model
 from tqdm import tqdm, trange
 from sys import exit
 
-from cpython cimport array
-import array
-
-from libc.stdlib cimport rand
-from libc.math cimport sqrt,log
+from libc.stdlib  cimport rand
+from libc.math    cimport sqrt, log, isnan
 
 cdef extern from "limits.h":
     int INT_MAX
@@ -109,7 +107,7 @@ class AIESampler(Sampler):
 
         return (U(0,1, size = size )*(self.space_scale**(1/2) - self.space_scale**(-1/2) ) + self.space_scale**(-1/2) )**2
 
-
+    @cython.nonecheck(False)
     @cython.wraparound(False)
     @cython.boundscheck(False)
     def AIEStep(self, log_function):
@@ -128,12 +126,12 @@ class AIESampler(Sampler):
           float log_accept_prob = 0.
           #float log_function_current = 0.
           #probably must be changed the structure od points for 1-D situations (ndim=2)
-          np.ndarray[np.float64_t, ndim=2] current_time_chain = self.chain[time_index]
-          np.ndarray[np.float64_t, ndim=2] next_time_chain    = np.zeros((nwalkers,space_dim), dtype=np.float64)
-          np.ndarray[np.float64_t, ndim=1] pivot_position           = np.zeros(space_dim, dtype=np.float64)
-          np.ndarray[np.float64_t, ndim=2] proposal_position        = np.zeros((nwalkers,space_dim), dtype=np.float64)
-          np.ndarray[np.float64_t, ndim=1] current_walker_position  = np.zeros(space_dim, dtype=np.float64)
-          np.ndarray[np.float64_t, ndim=1] log_function_proposal    = np.zeros(nwalkers, dtype=np.float64)
+          double [:,:]  current_time_chain = self.chain[time_index]
+          double [:,:]  proposal_position        = np.zeros((nwalkers,space_dim), dtype=np.float64)
+          double [:,:]  next_time_chain    = np.zeros((nwalkers,space_dim), dtype=np.float64)
+          double [:]    pivot_position           = np.zeros(space_dim, dtype=np.float64)
+          double [:] current_walker_position  = np.zeros(space_dim, dtype=np.float64)
+          double [:]    log_function_proposal    = np.zeros(nwalkers, dtype=np.float64)
 
         cdef int current_index = 0, pivot_index = 0
 
@@ -155,16 +153,13 @@ class AIESampler(Sampler):
         for current_index in range(nwalkers):
           #selects a random walker in the complementary ensemble as a pivot
           pivot_index     = (current_index + 1 + c_randint(nwalkers-1))%nwalkers
-          if pivot_index == current_index:
-              print('FATAL: pivot index is the same as current')
-              exit()
+
 
           #the 1/sqrt(z) distributed random stretch. See (dep) get_stretch()
           z = (A*randnum()+B)**2
 
           for i in range(space_dim):
-            current_walker_position[i]  = current_time_chain[current_index,i]
-            proposal_position[current_index, i] = current_time_chain[pivot_index,  i] + z*(current_walker_position[i] - current_time_chain[pivot_index,  i])
+            proposal_position[current_index, i] = current_time_chain[pivot_index,  i]*(1-z) + z*current_time_chain[current_index,i]
 
         #switch to bunch treatment
         log_function_proposal = log_function(proposal_position)
@@ -174,14 +169,9 @@ class AIESampler(Sampler):
           log_accept_prob = ( space_dim - 1) * log(z) + log_function_proposal[current_index] - log_function_current_state[current_index]
 
           #if point is out of function domain, sets rejection withoun MH accept
-          if log_function_proposal[current_index] != np.nan:
-            #use algebra
-            if log_accept_prob > log(rand()) - log(float_INT_MAX):
-              for i in range(space_dim):
-                next_time_chain[ current_index, i] = proposal_position[current_index,i]
-            else:
-              for i in range(space_dim):
-                next_time_chain[ current_index, i] = current_time_chain[current_index,i]
+          if not isnan(log_function_proposal[current_index]) and log_accept_prob > log(rand()) - log(float_INT_MAX):
+            for i in range(space_dim):
+              next_time_chain[ current_index, i] = proposal_position[current_index,i]
           else:
             for i in range(space_dim):
               next_time_chain[ current_index, i] = current_time_chain[current_index,i]

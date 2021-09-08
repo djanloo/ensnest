@@ -1,6 +1,6 @@
 import model
 import numpy as np
-import cy_samplers as samplers
+import  samplers
 
 
 class MyModel(model.Model):

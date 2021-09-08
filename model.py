@@ -1,6 +1,7 @@
 import numpy as np
 import utils
 
+
 class Model:
     '''Class to describe models
 
@@ -99,6 +100,7 @@ class Model:
 
                             The returned array has shape (\*,) = ``utils.pointshape(point)``
             '''
+            points = np.array(points)
             shape = list(points.shape)
 
             if shape.pop() != self.space_dim:
