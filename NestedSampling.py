@@ -29,29 +29,29 @@ class MyModel(model.Model):
 
 my_model = MyModel()
 nlive = 100
-npoints = 10
+npoints = 100
+
+def main():
+    #initialisation of the first nlive points and sorting
+    points = samplers.AIESampler(my_model, 100, nwalkers=nlive ).sample_function(my_model.log_prior).chain[99]
+    logLs  = my_model.log_likelihood(points)
+
+    points  = points[np.argsort(logLs)]
+    logLs   = np.sort(logLs)
 
 
-#initialisation of the first nlive points and sorting
-points = samplers.AIESampler(my_model, 100, nwalkers=nlive ).sample_function(my_model.log_prior).chain[99]
-logLs  = my_model.log_likelihood(points)
+    #initialise evolver sampler
+    evolve_sampler = samplers.AIESampler(my_model, 70 ,nwalkers=nlive-1)
 
-points  = points[np.argsort(logLs)]
-logLs   = np.sort(logLs)
+    for n_generated in trange(npoints):
 
+        evolve_sampler.chain[evolve_sampler.elapsed_time_index] = points[n_generated+1:].copy()
+        new_point = evolve_sampler.sample_over_threshold(logLs[n_generated])
 
-#initialise evolver sampler
-evolve_sampler = samplers.AIESampler(my_model, 70 ,nwalkers=nlive-1)
+        #inserts the point in the right place of the ordered list
+        replace_index = bisect_left(logLs, my_model.log_likelihood(new_point))
+        logLs         = np.insert(logLs, replace_index , my_model.log_likelihood(new_point))
+        points        = np.insert(points,  replace_index,  new_point, axis = 0)
 
-for n_generated in trange(npoints):
-
-    evolve_sampler.chain[evolve_sampler.elapsed_time_index] = points[n_generated+1:].copy()
-    new_point = evolve_sampler.sample_over_threshold(logLs[n_generated])
-
-    #inserts the point in the right place of the ordered list
-    replace_index = bisect_left(logLs, my_model.log_likelihood(new_point))
-    logLs         = np.insert(logLs, replace_index , my_model.log_likelihood(new_point))
-    points        = np.insert(points,  replace_index,  new_point, axis = 0)
-
-    #reset the sampler
-    evolve_sampler.reset()
+        #reset the sampler
+        evolve_sampler.reset()
