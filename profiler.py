@@ -1,6 +1,6 @@
 import model
 import numpy as np
-import cy_samplers
+import cy_samplers as samplers
 
 
 class MyModel(model.Model):
@@ -19,7 +19,7 @@ class MyModel(model.Model):
 my_model = MyModel()
 
 #initialise evolver sampler
-evolve_sampler = cy_samplers.AIESampler(my_model, 20 ,nwalkers=10)
+evolve_sampler = samplers.AIESampler(my_model, 20 ,nwalkers=10_000)
 
 def lol():
     evolve_sampler.AIEStep(my_model.log_prior)

@@ -19,14 +19,19 @@ import model
 from tqdm import tqdm, trange
 from sys import exit
 
+from cpython cimport array
+import array
+
 from libc.stdlib cimport rand
 from libc.math cimport sqrt,log
 
 cdef extern from "limits.h":
     int INT_MAX
 
+cdef float_INT_MAX = float(INT_MAX)
+
 cdef float randnum():
-  return rand() / float(INT_MAX)
+  return rand() / float_INT_MAX
 
 cdef int c_randint(int n):
   return rand()%n
@@ -119,62 +124,71 @@ class AIESampler(Sampler):
           int time_index    = self.elapsed_time_index
           int space_dim     = self.model.space_dim
           float space_scale = self.space_scale
+          float z = 0.
+          float log_accept_prob = 0.
+          #float log_function_current = 0.
           #probably must be changed the structure od points for 1-D situations (ndim=2)
-          np.ndarray[np.float64_t, ndim=2] current_chain = self.chain[time_index]
-          np.ndarray[np.float64_t, ndim=1] pivot_position           =np.zeros(space_dim, dtype=np.float64)
-          np.ndarray[np.float64_t, ndim=1] proposal_position        =np.zeros(space_dim, dtype=np.float64)
-          np.ndarray[np.float64_t, ndim=1] current_walker_position  =np.zeros(space_dim, dtype=np.float64)
+          np.ndarray[np.float64_t, ndim=2] current_time_chain = self.chain[time_index]
+          np.ndarray[np.float64_t, ndim=2] next_time_chain    = np.zeros((nwalkers,space_dim), dtype=np.float64)
+          np.ndarray[np.float64_t, ndim=1] pivot_position           = np.zeros(space_dim, dtype=np.float64)
+          np.ndarray[np.float64_t, ndim=2] proposal_position        = np.zeros((nwalkers,space_dim), dtype=np.float64)
+          np.ndarray[np.float64_t, ndim=1] current_walker_position  = np.zeros(space_dim, dtype=np.float64)
+          np.ndarray[np.float64_t, ndim=1] log_function_proposal    = np.zeros(nwalkers, dtype=np.float64)
 
-        cdef int current_index, pivot_index
-        cdef float z, log_accept_prob, log_function_proposal,log_function_current
+        cdef int current_index = 0, pivot_index = 0
+
+        #avoid useless calculations that are equal for each walker
+        cdef float A = sqrt(space_scale) - sqrt(1/space_scale)
+        cdef float B = sqrt(1/space_scale)
+
+        #since np functions are optimized for big bunch of data
+        #performing all log_f together boosts up to 500x
+        cdef np.ndarray[np.float64_t, ndim=1] log_function_current_state = log_function(current_time_chain)
+
+        #checks that every current point is inside an accessible region
+        if not np.isfinite(log_function_current_state).all():
+          print("FATAL: current point of chain is in impossible region")
+          exit()
 
         cdef int i
-        cdef list iterate_on_dimension = range(space_dim)
         #since it is cythonized, indexing instead of iteration
-        #in other tests cython is faster even than numpy multiplications/sums
-
         for current_index in range(nwalkers):
-          current_walker_position = current_chain[current_index].copy()
-
           #selects a random walker in the complementary ensemble as a pivot
           pivot_index     = (current_index + 1 + c_randint(nwalkers-1))%nwalkers
-          pivot_position  = current_chain[pivot_index]
-
           if pivot_index == current_index:
               print('FATAL: pivot index is the same as current')
               exit()
 
           #the 1/sqrt(z) distributed random stretch. See (dep) get_stretch()
-          z        = (randnum()*( sqrt(space_scale) - sqrt(1/space_scale)) + sqrt(1/space_scale) )**2
+          z = (A*randnum()+B)**2
 
           for i in range(space_dim):
-            proposal_position[i] = pivot_position[i] + z*(current_walker_position[i] - pivot_position[i])
+            current_walker_position[i]  = current_time_chain[current_index,i]
+            proposal_position[current_index, i] = current_time_chain[pivot_index,  i] + z*(current_walker_position[i] - current_time_chain[pivot_index,  i])
 
-          log_function_proposal = log_function(proposal_position)
-          log_function_current  = log_function(current_walker_position)
-          #print(f'current {current_index} has log_func{log_function_current}')
-          #checks that every current point is inside an accessible region
-          if log_function_current == -np.inf:
-            print("FATAL: current point of chain is in impossible region")
-            exit()
+        #switch to bunch treatment
+        log_function_proposal = log_function(proposal_position)
 
-          log_accept_prob = ( space_dim - 1) * log(z) + log_function_proposal - log_function_current
+        #switch to individual tratment
+        for current_index in range(nwalkers):
+          log_accept_prob = ( space_dim - 1) * log(z) + log_function_proposal[current_index] - log_function_current_state[current_index]
 
           #if point is out of function domain, sets rejection withoun MH accept
-          if log_function_proposal != np.nan:
-            if log_accept_prob > log(randnum()):
-              for i in iterate_on_dimension:
-                self.chain[time_index+1, current_index, i] = proposal_position[i]
+          if log_function_proposal[current_index] != np.nan:
+            #use algebra
+            if log_accept_prob > log(rand()) - log(float_INT_MAX):
+              for i in range(space_dim):
+                next_time_chain[ current_index, i] = proposal_position[current_index,i]
             else:
-              self.chain[time_index+1, current_index, :] = current_chain[current_index,:].copy()
+              for i in range(space_dim):
+                next_time_chain[ current_index, i] = current_time_chain[current_index,i]
           else:
-            self.chain[time_index+1, current_index, :] = current_chain[current_index,:].copy()
+            for i in range(space_dim):
+              next_time_chain[ current_index, i] = current_time_chain[current_index,i]
 
+        self.chain[time_index+1] = next_time_chain
         self.elapsed_time_index += 1
         return
-
-    def dummy(x):
-      return x
 
     def sample_function(self,log_function):
         """Samples function.
