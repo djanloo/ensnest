@@ -9,31 +9,13 @@ Each sampler shoud be capable of tackling with discontinuous functions.
 Since is intended to be used in nested sampling, each sampler should support likelihood constrained prior sampling (LCPS).
 
 """
-# cython: language_level=3
-#cython: boundscheck=False, wraparound=False, nonecheck=False
-import cython
-cimport cython
+
 import numpy as np
-cimport numpy as np
 from numpy.random import uniform as U
+from numpy.random import randint
 import model
 from tqdm import tqdm, trange
 from sys import exit
-
-from libc.stdlib  cimport rand
-from libc.math    cimport sqrt, log, isnan
-
-cdef extern from "limits.h":
-    int INT_MAX
-
-cdef float_INT_MAX = float(INT_MAX)
-
-cdef float randnum():
-  return rand() / float_INT_MAX
-
-cdef int c_randint(int n):
-  return rand()%n
-
 
 class Sampler:
     """Produces samples from model.
@@ -61,7 +43,7 @@ class Sampler:
         self.verbosity  = verbosity
         self.elapsed_time_index = 0     #'time' index up to which self.chain has been developed
 
-        self.chain      = np.zeros((self.length, self.nwalkers, self.model.space_dim) , dtype=np.float64)
+        self.chain      = np.zeros((self.length, self.nwalkers, self.model.space_dim))
 
         #uniform initialisation
         for walker in range(self.nwalkers):
@@ -99,17 +81,10 @@ class AIESampler(Sampler):
 
         Output is distibuted as :math:`\\frac{1}{\\sqrt{z}}`  in :math:`[1/a,a]``.
         Uses inverse transform sampling
-
-        warning
-        -------
-            In ``cython`` version is deprecated.
         '''
 
         return (U(0,1, size = size )*(self.space_scale**(1/2) - self.space_scale**(-1/2) ) + self.space_scale**(-1/2) )**2
 
-    @cython.nonecheck(False)
-    @cython.wraparound(False)
-    @cython.boundscheck(False)
     def AIEStep(self, log_function):
         '''Single step of AIESampler
 
@@ -117,68 +92,42 @@ class AIESampler(Sampler):
             ----
                 log_function : function
         '''
-        cdef:
-          int nwalkers      = self.nwalkers
-          int time_index    = self.elapsed_time_index
-          int space_dim     = self.model.space_dim
-          float space_scale = self.space_scale
-          float z = 0.
-          float log_accept_prob = 0.
-          #float log_function_current = 0.
-          #probably must be changed the structure od points for 1-D situations (ndim=2)
-          double [:,:]  current_time_chain = self.chain[time_index]
-          double [:,:]  proposal_position        = np.zeros((nwalkers,space_dim), dtype=np.float64)
-          double [:,:]  next_time_chain    = np.zeros((nwalkers,space_dim), dtype=np.float64)
-          double [:]    pivot_position           = np.zeros(space_dim, dtype=np.float64)
-          double [:] current_walker_position  = np.zeros(space_dim, dtype=np.float64)
-          double [:]    log_function_proposal    = np.zeros(nwalkers, dtype=np.float64)
+        #considers the whole ensamble at at time
+        current_walker_index    = np.arange(self.nwalkers)
+        current_walker_position = self.chain[self.elapsed_time_index,current_walker_index, :]
 
-        cdef int current_index = 0, pivot_index = 0
+        #OPTIMIZATION: np.random.randint is really slow
+        #generate a number from 1 to self.nwalkers-1
+        delta_index = ((self.nwalkers-2)*np.random.rand(self.nwalkers)+1).astype(int)
 
-        #avoid useless calculations that are equal for each walker
-        cdef float A = sqrt(space_scale) - sqrt(1/space_scale)
-        cdef float B = sqrt(1/space_scale)
+        #for each walker selects randomly another walker as a pivot for the stretch move
+        pivot_index     = (current_walker_index + delta_index   ) % self.nwalkers
+        pivot_position  = self.chain[self.elapsed_time_index, pivot_index, : ]
 
-        #since np functions are optimized for big bunch of data
-        #performing all log_f together boosts up to 500x
-        cdef np.ndarray[np.float64_t, ndim=1] log_function_current_state = log_function(current_time_chain)
+        if (pivot_index == current_walker_index).any():
+            print('pivot index is the same as current')
+            exit()
 
-        #checks that every current point is inside an accessible region
-        if not np.isfinite(log_function_current_state).all():
-          print("FATAL: current point of chain is in impossible region")
-          exit()
+        z        = self.get_stretch(size = self.nwalkers)
+        proposal = pivot_position + z[:,None] * (current_walker_position - pivot_position)
 
-        cdef int i
-        #since it is cythonized, indexing instead of iteration
-        for current_index in range(nwalkers):
-          #selects a random walker in the complementary ensemble as a pivot
-          pivot_index     = (current_index + 1 + c_randint(nwalkers-1))%nwalkers
+        log_function_proposal = log_function(proposal)
+        log_function_current  = log_function(current_walker_position)
 
+        log_accept_prob = ( self.model.space_dim - 1) * np.log(z) + log_function_proposal - log_function_current
 
-          #the 1/sqrt(z) distributed random stretch. See (dep) get_stretch()
-          z = (A*randnum()+B)**2
+        #if point is out of function domain, sets rejection
+        log_accept_prob[np.isnan(log_function_proposal)] = -np.inf
 
-          for i in range(space_dim):
-            proposal_position[current_index, i] = current_time_chain[pivot_index,  i]*(1-z) + z*current_time_chain[current_index,i]
+        if not np.isfinite(log_function_current).all():
+            print(f'FATAL: past point is in impossible position')
+            exit()
 
-        #switch to bunch treatment
-        log_function_proposal = log_function(proposal_position)
+        accepted = (log_accept_prob > np.log(U(0,1,size = self.nwalkers)))
 
-        #switch to individual tratment
-        for current_index in range(nwalkers):
-          log_accept_prob = ( space_dim - 1) * log(z) + log_function_proposal[current_index] - log_function_current_state[current_index]
-
-          #if point is out of function domain, sets rejection withoun MH accept
-          if not isnan(log_function_proposal[current_index]) and log_accept_prob > log(rand()) - log(float_INT_MAX):
-            for i in range(space_dim):
-              next_time_chain[ current_index, i] = proposal_position[current_index,i]
-          else:
-            for i in range(space_dim):
-              next_time_chain[ current_index, i] = current_time_chain[current_index,i]
-
-        self.chain[time_index+1] = next_time_chain
+        self.chain[self.elapsed_time_index+1, accepted,:]                 = proposal[accepted]
+        self.chain[self.elapsed_time_index+1, np.logical_not(accepted),:] = self.chain[self.elapsed_time_index, np.logical_not(accepted), :]
         self.elapsed_time_index += 1
-        return
 
     def sample_function(self,log_function):
         """Samples function.
@@ -252,7 +201,6 @@ class AIESampler(Sampler):
 
         if not np.isfinite(LCprior(self.chain[self.elapsed_time_index])).all():
             print('WARNING: at least one point is out of L-bounds')
-            print(LCprior(self.chain[self.elapsed_time_index]))
 
         #TODO: this line costs a lot of lik-evaluation. solve
         initial_log_likelihoods = self.model.log_likelihood(self.chain[self.elapsed_time_index])

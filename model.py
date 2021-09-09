@@ -1,7 +1,6 @@
 import numpy as np
 import utils
 
-
 class Model:
     '''Class to describe models
 
@@ -172,6 +171,7 @@ class Model:
         def _autobound_wrapper(self,*args):
             return log_func(self,*args) + self.log_chi(*args)
         return _autobound_wrapper
+
 
 def unpack_variables(x):
     '''Helper function that performs values shapecasting.
