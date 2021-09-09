@@ -9,7 +9,7 @@ Each sampler shoud be capable of tackling with discontinuous functions.
 Since is intended to be used in nested sampling, each sampler should support likelihood constrained prior sampling (LCPS).
 
 """
-
+from sys import exit
 import numpy as np
 from numpy.random import uniform as U
 from numpy.random import randint
@@ -103,9 +103,9 @@ class AIESampler(Sampler):
         pivot_index     = (current_walker_index + delta_index   ) % self.nwalkers
         pivot_position  = self.chain[self.elapsed_time_index, pivot_index, : ]
 
-        if (pivot_index == current_walker_index).any():
-            print('pivot index is the same as current')
-            exit()
+        #if (pivot_index == current_walker_index).any():
+        #    print('pivot index is the same as current')
+        #    exit()
 
         z        = self.get_stretch(size = self.nwalkers)
         proposal = pivot_position + z[:,None] * (current_walker_position - pivot_position)
@@ -120,7 +120,7 @@ class AIESampler(Sampler):
 
         if not np.isfinite(log_function_current).all():
             print(f'FATAL: past point is in impossible position')
-            exit()
+            #exit()
 
         accepted = (log_accept_prob > np.log(U(0,1,size = self.nwalkers)))
 

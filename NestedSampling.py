@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 import model
 import test
@@ -10,9 +11,10 @@ from tqdm import trange
 import pyximport; pyximport.install()
 import samplers
 
-import cProfile, pstats
+from functools import lru_cache
 
 np.seterr(divide = 'ignore')
+
 
 class MyModel(model.Model):
     def __init__(self):
@@ -23,6 +25,7 @@ class MyModel(model.Model):
     def log_prior(self,x):
         return 0
 
+    @lru_cache
     def log_likelihood(self,x):
         return -0.5*np.sum(x**2,axis = -1)
 
@@ -30,7 +33,7 @@ class MyModel(model.Model):
 my_model = MyModel()
 nlive = 100
 npoints = 100
-
+points = np.array(0)
 def main():
     #initialisation of the first nlive points and sorting
     points = samplers.AIESampler(my_model, 100, nwalkers=nlive ).sample_function(my_model.log_prior).chain[99]
@@ -55,3 +58,12 @@ def main():
 
         #reset the sampler
         evolve_sampler.reset()
+
+if __name__ == '__main__':
+    try:
+        globals()[sys.argv[1]]()
+        if sys.argv[2] == '-p':
+            plt.plot(points[:,0], points[:,1])
+            plt.show()
+    except IndexError:
+        pass
