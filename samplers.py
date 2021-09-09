@@ -81,11 +81,10 @@ class AIESampler(Sampler):
         Output is distibuted as :math:`\\frac{1}{\\sqrt{z}}`  in :math:`[1/a,a]``.
         Uses inverse transform sampling
         '''
-
         return (U(0,1, size = size )*(self.space_scale**(1/2) - self.space_scale**(-1/2) ) + self.space_scale**(-1/2) )**2
 
     def AIEStep(self, log_function):
-        '''Single step of AIESampler
+        '''Single step of AIESampler.
 
             Args
             ----
@@ -102,10 +101,6 @@ class AIESampler(Sampler):
         #for each walker selects randomly another walker as a pivot for the stretch move
         pivot_index     = (current_walker_index + delta_index   ) % self.nwalkers
         pivot_position  = self.chain[self.elapsed_time_index, pivot_index, : ]
-
-        #if (pivot_index == current_walker_index).any():
-        #    print('pivot index is the same as current')
-        #    exit()
 
         z        = self.get_stretch(size = self.nwalkers)
         proposal = pivot_position + z[:,None] * (current_walker_position - pivot_position)
@@ -162,6 +157,7 @@ class AIESampler(Sampler):
 
         returns:
             np.ndarray : the chain obtained
+            
         """
         for t in trange(self.length - 1):
             self.AIEStep(log_function)

@@ -1,5 +1,23 @@
 import numpy as np
 import utils
+import functools
+
+class live_point:
+    '''Class describing live points.
+
+    Mainly introduced to cache log_likelihood and log_prior calculations
+    '''
+    def __init__(self,model,position):
+        self.position   = np.array(position)
+        self.model      = model
+
+    @functools.cached_property
+    def logL(self):
+        return np.vectorize(self.model.log_likelihood(self.position))
+
+    @functools.cached_property
+    def logP(self):
+        return np.vectorize(self.model.log_prior(self.position))
 
 class Model:
     '''Class to describe models
@@ -171,6 +189,8 @@ class Model:
         def _autobound_wrapper(self,*args):
             return log_func(self,*args) + self.log_chi(*args)
         return _autobound_wrapper
+
+
 
 
 def unpack_variables(x):
