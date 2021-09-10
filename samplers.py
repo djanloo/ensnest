@@ -130,18 +130,13 @@ class AIESampler(Sampler):
 
         accepted = (log_accept_prob > np.log(U(0,1,size = self.nwalkers)))
 
-        #debug
-        nacc = np.sum(accepted.astype(int))/self.nwalkers
-        delta = np.sqrt(np.mean( (current_walker_position - proposal)**2   ,axis = 0))
-        zeropropcount = np.sum( (proposal == np.zeros(self.model.space_dim)).astype(int)  )
-        breakpoint()
         #assigns accepted values
         self.chain[self.elapsed_time_index+1, accepted]['position'] = proposal[accepted]
         self.chain[self.elapsed_time_index+1, accepted]['logP']     = log_prior_proposal[accepted]
         self.chain[self.elapsed_time_index+1, accepted]['logL']     = self.model.log_likelihood(proposal[accepted])
         #copies rejected values
         self.chain[self.elapsed_time_index+1, np.logical_not(accepted)] = self.chain[self.elapsed_time_index, np.logical_not(accepted)]
-
+        breakpoint()
         self.elapsed_time_index += 1
 
     def sample_prior(self, Lthreshold = None):
