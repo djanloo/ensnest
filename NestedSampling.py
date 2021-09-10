@@ -42,7 +42,6 @@ def main():
     points  = points[np.argsort(logLs)]
     logLs   = np.sort(logLs)
 
-
     #initialise evolver sampler
     evolve_sampler = samplers.AIESampler(my_model, 70 ,nwalkers=nlive-1)
 

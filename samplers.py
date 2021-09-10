@@ -42,12 +42,15 @@ class Sampler:
         self.verbosity  = verbosity
         self.elapsed_time_index = 0     #'time' index up to which self.chain has been developed
 
-        self.chain      = np.zeros((self.length, self.nwalkers, self.model.space_dim))
+
+        #the squeeze method is for mantaining generality. Single-walker methods reduce to normal definition.
+        self.chain      = np.zeros((self.length, self.nwalkers) , dtype=self.model.livepoint_t).squeeze()
 
         #uniform initialisation
         for walker in range(self.nwalkers):
-            self.chain[0, walker, : ] = U(*self.model.bounds)
-
+            self.chain[0, walker]['position']   = U(*self.model.bounds)
+            self.chain[0, walker]['logP']       = self.model.log_prior(self.chain[0, walker]['position'])
+            self.chain[0, walker]['logL']       = self.model.log_likelihood(self.chain[0, walker]['position'])
 
 class AIESampler(Sampler):
     '''The Affine-Invariant Ensemble sampler (Goodman, Weare, 2010).
@@ -65,14 +68,18 @@ class AIESampler(Sampler):
 
     '''
 
-    def __init__(self, model, mcmc_length, nwalkers=10, space_scale = 4, verbosity=0):
+    def __init__(self, model, mcmc_length, nwalkers=10, space_scale = None, verbosity=0):
 
         super().__init__(model, mcmc_length, nwalkers, verbosity=verbosity)
-
-        if space_scale <= 1:
-            print('space scale parameter must be > 1')
-            exit()
+        #if space_scale is not defined takes the 'diameter' of the space
         self.space_scale = space_scale
+        if self.space_scale is None:
+            self.space_scale = 0.5*np.sqrt(np.sum(self.model.bounds[0]**2)) + 0.5*np.sqrt(np.sum(self.model.bounds[1]**2))
+        if self.space_scale <= 1:
+            print('space scale parameter must be > 1: set 2x')
+            self.space_scale *= 2
+
+        print(f'space_scale is {self.space_scale}')
 
     def get_stretch(self, size = 1):
         '''
@@ -83,47 +90,61 @@ class AIESampler(Sampler):
         '''
         return (U(0,1, size = size )*(self.space_scale**(1/2) - self.space_scale**(-1/2) ) + self.space_scale**(-1/2) )**2
 
-    def AIEStep(self, log_function):
+    def AIEStep(self, Lthreshold = None):
         '''Single step of AIESampler.
 
             Args
             ----
-                log_function : function
+                Lthreshold : float, optional
+                    The threshold of likelihood below which a point is set as impossible to reach
         '''
         #considers the whole ensamble at at time
-        current_walker_index    = np.arange(self.nwalkers)
-        current_walker_position = self.chain[self.elapsed_time_index,current_walker_index, :]
+        current_walker_position = self.chain[self.elapsed_time_index,:]['position']
 
         #OPTIMIZATION: np.random.randint is really slow
         #generate a number from 1 to self.nwalkers-1
         delta_index = ((self.nwalkers-2)*np.random.rand(self.nwalkers)+1).astype(int)
 
         #for each walker selects randomly another walker as a pivot for the stretch move
-        pivot_index     = (current_walker_index + delta_index   ) % self.nwalkers
-        pivot_position  = self.chain[self.elapsed_time_index, pivot_index, : ]
+        pivot_index     = (np.arange(self.nwalkers) + delta_index   ) % self.nwalkers
+        pivot_position  = self.chain[self.elapsed_time_index, pivot_index]['position']
 
         z        = self.get_stretch(size = self.nwalkers)
         proposal = pivot_position + z[:,None] * (current_walker_position - pivot_position)
 
-        log_function_proposal = log_function(proposal)
-        log_function_current  = log_function(current_walker_position)
+        log_prior_proposal = self.model.log_prior(proposal)
+        log_prior_current  = self.chain[self.elapsed_time_index, :]['logP']
 
-        log_accept_prob = ( self.model.space_dim - 1) * np.log(z) + log_function_proposal - log_function_current
+        if not np.isfinite(log_prior_current).all():
+            print(f'FATAL: past point is in impossible position')
+            exit()
+
+        #if a threshold Lmin is set, sets as 'impossible' the proposals outside
+        if Lthreshold is not None:
+            log_prior_proposal[self.model.log_likelihood(proposal) < Lthreshold] = -np.inf
+
+        log_accept_prob = ( self.model.space_dim - 1) * np.log(z) + log_prior_proposal - log_prior_current
 
         #if point is out of function domain, sets rejection
-        log_accept_prob[np.isnan(log_function_proposal)] = -np.inf
-
-        if not np.isfinite(log_function_current).all():
-            print(f'FATAL: past point is in impossible position')
-            #exit()
+        log_accept_prob[np.isnan(log_prior_proposal)] = -np.inf
 
         accepted = (log_accept_prob > np.log(U(0,1,size = self.nwalkers)))
 
-        self.chain[self.elapsed_time_index+1, accepted,:]                 = proposal[accepted]
-        self.chain[self.elapsed_time_index+1, np.logical_not(accepted),:] = self.chain[self.elapsed_time_index, np.logical_not(accepted), :]
+        #debug
+        nacc = np.sum(accepted.astype(int))/self.nwalkers
+        delta = np.sqrt(np.mean( (current_walker_position - proposal)**2   ,axis = 0))
+        zeropropcount = np.sum( (proposal == np.zeros(self.model.space_dim)).astype(int)  )
+        breakpoint()
+        #assigns accepted values
+        self.chain[self.elapsed_time_index+1, accepted]['position'] = proposal[accepted]
+        self.chain[self.elapsed_time_index+1, accepted]['logP']     = log_prior_proposal[accepted]
+        self.chain[self.elapsed_time_index+1, accepted]['logL']     = self.model.log_likelihood(proposal[accepted])
+        #copies rejected values
+        self.chain[self.elapsed_time_index+1, np.logical_not(accepted)] = self.chain[self.elapsed_time_index, np.logical_not(accepted)]
+
         self.elapsed_time_index += 1
 
-    def sample_function(self,log_function):
+    def sample_prior(self, Lthreshold = None):
         """Samples function.
 
         The real problem for being used in NS is that it is not clear how
@@ -157,15 +178,11 @@ class AIESampler(Sampler):
 
         returns:
             np.ndarray : the chain obtained
-            
+
         """
         for t in trange(self.length - 1):
-            self.AIEStep(log_function)
+            self.AIEStep(Lthreshold = Lthreshold)
         return self
-
-    def likelihood_constraint(self,x,worstL):
-        result = np.log((self.model.log_likelihood(x) > worstL).astype(int))
-        return result
 
     def sample_over_threshold(self,Lmin):
         '''Performs likelihood-constrained prior sampling.
@@ -182,9 +199,9 @@ class AIESampler(Sampler):
 
         This function uses the AIE sampler on the current live points (nlive -1) and
         evolves them in the likelihood-constrained prior to generate other (nlive - 1)
-        points, then takes one at random.
+        points, then takes one at random. Not the most efficient but it was the best way I could find.
 
-        Furthermore, the newly generated point is forced to have likelihood different from all the initial ones.
+        Furthermore, the newly generated point is forced to have likelihood different from ALL the initial ones.
 
         note
         ----
@@ -218,7 +235,6 @@ class AIESampler(Sampler):
         self.elapsed_time_index = 0
         self.chain = np.zeros((self.length, self.nwalkers, self.model.space_dim))
 
-
     def join_chains(self, burn_in = 0.02):
         '''Joins the chains for the ensemble after removing  ``burn_in`` \% of each single_particle chain.
 
@@ -229,5 +245,5 @@ class AIESampler(Sampler):
 
                 Must be ``burn_in`` > 0 and ``burn_in`` < 1.
         '''
-        joined_chain = self.chain[ int(burn_in*self.length) :].reshape(-1, self.model.space_dim)
+        joined_chain = self.chain[ int(burn_in*self.length) :].flatten()
         return joined_chain
