@@ -2,16 +2,6 @@ import numpy as np
 import utils
 import functools
 
-class dummy:
-
-    def __init__(self,value):
-        self.value = value
-
-    @np.vectorize
-    @property
-    def value(self):
-        return value
-
 class Model:
     '''Class to describe models
 
@@ -37,7 +27,7 @@ class Model:
 
     '''
     def __init__(self):
-        '''Checks the model.
+        '''Initialise and checks the model
         '''
         self.bounds = (np.array(self.bounds[0]).astype(float), np.array(self.bounds[1]).astype(float))
 

@@ -25,7 +25,6 @@ class MyModel(model.Model):
     def log_prior(self,x):
         return 0
 
-    @lru_cache
     def log_likelihood(self,x):
         return -0.5*np.sum(x**2,axis = -1)
 
@@ -36,7 +35,7 @@ npoints = 100
 points = np.array(0)
 def main():
     #initialisation of the first nlive points and sorting
-    points = samplers.AIESampler(my_model, 100, nwalkers=nlive ).sample_function(my_model.log_prior).chain[99]
+    points = samplers.AIESampler(my_model, 100, nwalkers=nlive ).sample_prior().chain[99]
     logLs  = my_model.log_likelihood(points)
 
     points  = points[np.argsort(logLs)]
@@ -48,7 +47,7 @@ def main():
     for n_generated in trange(npoints):
 
         evolve_sampler.chain[evolve_sampler.elapsed_time_index] = points[n_generated+1:].copy()
-        new_point = evolve_sampler.sample_over_threshold(logLs[n_generated])
+        new_point = evolve_sampler.sample_prior(Lthreshold = logLs[n_generated])
 
         #inserts the point in the right place of the ordered list
         replace_index = bisect_left(logLs, my_model.log_likelihood(new_point))

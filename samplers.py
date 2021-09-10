@@ -79,8 +79,6 @@ class AIESampler(Sampler):
             print('space scale parameter must be > 1: set 2x')
             self.space_scale *= 2
 
-        print(f'space_scale is {self.space_scale}')
-
     def get_stretch(self, size = 1):
         '''
         Generates the stretch values given the scale_parameter ``a``.
@@ -131,12 +129,11 @@ class AIESampler(Sampler):
         accepted = (log_accept_prob > np.log(U(0,1,size = self.nwalkers)))
 
         #assigns accepted values
-        self.chain[self.elapsed_time_index+1, accepted]['position'] = proposal[accepted]
-        self.chain[self.elapsed_time_index+1, accepted]['logP']     = log_prior_proposal[accepted]
-        self.chain[self.elapsed_time_index+1, accepted]['logL']     = self.model.log_likelihood(proposal[accepted])
-        #copies rejected values
+        self.chain['position'][self.elapsed_time_index+1, accepted] = proposal[accepted]
+        self.chain['logP'][self.elapsed_time_index+1, accepted]     = log_prior_proposal[accepted]
+        self.chain['logL'][self.elapsed_time_index+1, accepted]     = self.model.log_likelihood(proposal[accepted])
+        # copies rejected values
         self.chain[self.elapsed_time_index+1, np.logical_not(accepted)] = self.chain[self.elapsed_time_index, np.logical_not(accepted)]
-        breakpoint()
         self.elapsed_time_index += 1
 
     def sample_prior(self, Lthreshold = None):
@@ -175,60 +172,35 @@ class AIESampler(Sampler):
             np.ndarray : the chain obtained
 
         """
-        for t in trange(self.length - 1):
+        for t in range(self.length - 1):
             self.AIEStep(Lthreshold = Lthreshold)
         return self
 
-    def sample_over_threshold(self,Lmin):
-        '''Performs likelihood-constrained prior sampling.
-
-        The NS algorithm starts with a set :math:`{\theta_i}` of points distributed as :math:`\pi(\theta)`
-
-        After excluding the worst (:math:`L_{w}`), a new point of likelihood greater than :math:`L_{w}`
-        has to be generated. One has freedom to choose the way this new point is yielded,
-        as long as the new point has pdf:
-
-            .. math::
-                p(\theta_{new}) d\theta_{new} = \pi(\theta_{new}) (L(\theta_{new}) > L_w)
-                p(\theta_{new}) d\theta_{new} = 0                 (L(\theta_{new}) > L_w)
-
-        This function uses the AIE sampler on the current live points (nlive -1) and
-        evolves them in the likelihood-constrained prior to generate other (nlive - 1)
-        points, then takes one at random. Not the most efficient but it was the best way I could find.
-
-        Furthermore, the newly generated point is forced to have likelihood different from ALL the initial ones.
-
-        note
-        ----
-            (at the moment) sampler has to be initialised to points already inside bounds
-
-            To solve: conflict nlive -> nlive - 1
+    def get_new(self,Lmin):
+        '''Returns a new different point from prior given likelihood threshold
         '''
-        LCprior = lambda x: self.model.log_prior(x) + self.likelihood_constraint(x, Lmin)
-
-        if not np.isfinite(LCprior(self.chain[self.elapsed_time_index])).all():
-            print('WARNING: at least one point is out of L-bounds')
-
-        #TODO: this line costs a lot of lik-evaluation. solve
-        initial_log_likelihoods = self.model.log_likelihood(self.chain[self.elapsed_time_index])
-
         #generates nlive - 1 points over L>Lmin
-        for t in range(self.length - 1):
-            self.AIEStep(LCprior)
+        for t in range(1,self.length):
+            self.AIEStep(Lthreshold = Lmin)
 
         #selects one of this point give it's different from the given ones
-        is_duplicate    = (self.model.log_likelihood(self.chain[self.elapsed_time_index]) == initial_log_likelihoods[:,None]).any(axis = 0)
+        is_duplicate    = (self.chain['logL'][self.elapsed_time_index] == self.chain['logL'][0][:,None]).any(axis = 0)
         n_duplicate     = np.sum(is_duplicate.astype(int))
 
-        if is_duplicate.any(): print(f'>>>>>>>>>>> WARNING: {n_duplicate} duplicate(s) found')
+        if n_duplicate/self.nwalkers > 0.8: print(f'>>>>>>>>>>> WARNING: {int(n_duplicate/self.nwalkers*100)}% of duplicate(s) found')
 
-        correct_ones = self.chain[self.elapsed_time_index, np.logical_not(is_duplicate), :]
-        new_point    = correct_ones[np.random.randint(self.nwalkers - n_duplicate), :]
+        correct_ones = self.chain[self.elapsed_time_index, np.logical_not(is_duplicate)]
+        new_point    = correct_ones[np.random.randint(self.nwalkers - n_duplicate)]
         return new_point
 
     def reset(self):
         self.elapsed_time_index = 0
-        self.chain = np.zeros((self.length, self.nwalkers, self.model.space_dim))
+        self.chain      = np.zeros((self.length, self.nwalkers) , dtype=self.model.livepoint_t).squeeze()
+
+    def tail_to_head(self):
+        self.chain[0] = self.chain[self.elapsed_time_index]
+        self.elapsed_time_index = 0
+        return self
 
     def join_chains(self, burn_in = 0.02):
         '''Joins the chains for the ensemble after removing  ``burn_in`` \% of each single_particle chain.
@@ -240,5 +212,4 @@ class AIESampler(Sampler):
 
                 Must be ``burn_in`` > 0 and ``burn_in`` < 1.
         '''
-        joined_chain = self.chain[ int(burn_in*self.length) :].flatten()
-        return joined_chain
+        return self.chain[int(burn_in*self.length):].flatten()
