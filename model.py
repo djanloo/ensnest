@@ -51,9 +51,13 @@ class Model:
         for i in range(self.space_dim - len(self.names)):
             self.names.append('var%d'%i)
 
+        #defines the datatype used in variable environment (varenv)
+        #and output results
         self.position_t  = np.dtype([ (name, np.float64) for name in self.names])
+
+        #defines the datatype used inside code
         self.livepoint_t = np.dtype([
-                                ('position' , self.position_t),
+                                ('position' , np.float64, (self.space_dim,)), #using the dtype position_t makes the rest of the code really silly
                                 ('logL'     , np.float64),
                                 ('logP'     , np.float64)
                                 ])
@@ -72,9 +76,7 @@ class Model:
 
         #checks for (time, walker, position)-like evaluation
         testshape = (4,3)
-        dummy = np.random.random(testshape + (self.space_dim,)).view(self.position_t).squeeze()
-        # for some unknown reasons, the view method in the above line gives an extra 1 in the shape -> use squeeze
-        # may bring problem in unusual situations
+        dummy = np.random.random(testshape + (self.space_dim,))
 
         log_prior_result = self.log_prior(dummy)
 
@@ -86,8 +88,8 @@ class Model:
 
         #checks for (time, position)-like evaluation
         #and iteration order differences
-        testshape = (3,self.space_dim)
-        dummy = np.random.random(testshape).view(self.position_t)
+        testshape = (3,)
+        dummy = np.random.random(testshape + (self.space_dim,))
 
         result1 = np.array([self.log_prior(_) for _ in dummy])
         result2 = self.log_prior(dummy)
@@ -101,17 +103,15 @@ class Model:
         if not (result1 == result2).any():
             raise ValueError('Bad-behaving log_likelihood: different results for different iteration order')
 
-    def destructure(func):
-        '''Helper function to manipulate data inside user-defined functins.
-
-            Reduces the internal structure of variables to a standard np.ndarray.
-            Useful when iterative operations have to be made upon the input.
+    def varenv(func):
         '''
-        def _destructure_wrap(self, x):
-            return func(self, rfn.structured_to_unstructured(x))
-        return _destructure_wrap    
+        Helper function to index the variables by name inside user-defined functions
+        '''
+        def _wrap(self,x,*args, **kwargs):
+            x = x.view(self.position_t).squeeze()
+            return func(self, x)
+        return _wrap
 
-    @destructure
     def is_inside_bounds(self,points):
             '''Checks if a point is inside the space bounds.
 
@@ -126,11 +126,11 @@ class Model:
 
                             The returned array has shape (\*,) = ``utils.pointshape(point)``
             '''
-            shape = points.shape
+            shape = np.array(points.shape)[:-1]
 
             is_coordinate_inside = np.logical_and(  points > self.bounds[0],
                                                     points < self.bounds[1])
-
+                                                    
             return is_coordinate_inside.all(axis = -1).reshape(shape)
 
     def log_chi(self, points):
