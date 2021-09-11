@@ -20,9 +20,8 @@ class MyModel(model.Model):
 
     @model.Model.auto_bound
     def log_prior(self,x):
-        return 0#np.log(1/x[...,0])
+        return 0
 
-    @model.Model.destructure
     def log_likelihood(self,x):
         return -0.5*np.sum(x**2,axis = -1)
 
@@ -43,4 +42,7 @@ for i in trange(npoints):
     evo.chain[0]  = points[i+1 :]
 
     evo.elapsed_time_index = 0
+
 logX = -np.linspace(0,1,nlive+npoints)/(nlive+npoints)
+plt.plot(logX, points['logL'])
+plt.show()
