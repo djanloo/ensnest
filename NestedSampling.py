@@ -15,7 +15,6 @@ from functools import lru_cache
 
 np.seterr(divide = 'ignore')
 
-
 class MyModel(model.Model):
     def __init__(self):
         self.bounds = (-np.ones(2)*10 ,np.ones(2)*10 )
