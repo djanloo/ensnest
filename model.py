@@ -30,9 +30,10 @@ class Model:
         '''Initialise and checks the model
         '''
         self.bounds = (np.array(self.bounds[0]).astype(float), np.array(self.bounds[1]).astype(float))
+        if not hasattr(self, 'names'):
+            self.names = []
 
         try:
-
             dim1 = self.bounds[0].shape[0]
             dim2 = self.bounds[1].shape[0]
             if dim1 == dim2:
@@ -40,12 +41,18 @@ class Model:
             else:
                 print('Different space dimensions in bounds')
                 exit()
-
         except IndexError: #in case bounds is given of the form (n,m)
             self.space_dim   = 1
 
+        #defines the structure of the data used
+        #this semplifies the usage
+        #creates a list of dummy names to give to the variables
+        for i in range(self.space_dim - len(self.names)):
+            self.names.append('var%d'%i)
+
+        self.position_t  = np.dtype([ (name, np.float64) for name in self.names])
         self.livepoint_t = np.dtype([
-                                ('position' , np.float64, (self.space_dim,) ),
+                                ('position' , self.position_t),
                                 ('logL'     , np.float64),
                                 ('logP'     , np.float64)
                                 ])
@@ -64,7 +71,9 @@ class Model:
 
         #checks for (time, walker, position)-like evaluation
         testshape = (4,3)
-        dummy = np.random.random(testshape + (self.space_dim,))
+        dummy = np.random.random(testshape + (self.space_dim,)).view(self.position_t).squeeze()
+        # for some unknown reasons, the view method in the above line gives an extra 1 in the shape -> use squeeze
+        # may bring problem in unusual situations
 
         log_prior_result = self.log_prior(dummy)
 
@@ -76,8 +85,8 @@ class Model:
 
         #checks for (time, position)-like evaluation
         #and iteration order differences
-        testshape = (3,)
-        dummy = np.random.random(testshape + (self.space_dim,))
+        testshape = (3,self.space_dim)
+        dummy = np.random.random(testshape).view(self.position_t)
 
         result1 = np.array([self.log_prior(_) for _ in dummy])
         result2 = self.log_prior(dummy)
@@ -105,16 +114,13 @@ class Model:
 
                             The returned array has shape (\*,) = ``utils.pointshape(point)``
             '''
-            points = np.array(points)
-            shape = list(points.shape)
+            shape = points.shape
+            #takes the structured points, position only, converts to (\*, space_dim)
+            points = points.copy().view(np.float64).reshape(-1, self.space_dim)
 
-            if shape.pop() != self.space_dim:
-                raise IndexError('Last axis must have len == space_dim')
+            is_coordinate_inside = np.logical_and(  points > self.bounds[0],
+                                                    points < self.bounds[1])
 
-            shape = tuple(shape)
-            list_of_points       = points.reshape(-1,self.space_dim)
-            is_coordinate_inside = np.logical_and(  list_of_points > self.bounds[0],
-                                                    list_of_points < self.bounds[1])
             return is_coordinate_inside.all(axis = -1).reshape(shape)
 
     def log_chi(self, points):
@@ -146,12 +152,6 @@ class Model:
         '''
         return np.logical_and((points > self.bounds[0]).all(axis = -1),(points < self.bounds[1]).all(axis = -1))
 
-
-    def pointshape(self,x):
-        """ ``self`` shorthand for ``utils.pointshape(x, dim = self.space_dim)``
-        """
-        return utils.pointshape(x, dim = self.space_dim)
-
     def auto_bound(log_func):
         '''Decorator to bound functions.
 
@@ -177,44 +177,3 @@ class Model:
         def _autobound_wrapper(self,*args):
             return log_func(self,*args) + self.log_chi(*args)
         return _autobound_wrapper
-
-
-
-
-def unpack_variables(x):
-    '''Helper function that performs values shapecasting.
-
-    Given a ``np.ndarray`` of shape ``(n1,n2,--, space_dim)``
-    returns an unpackable array of shape ``(space_dim, n1,n2, --)``.
-
-    note
-    ----
-        if any of the n1, n2, -- other dimension is equal to 1,
-        it gets squeezed as it is an unnecessary nesting.
-        Indeed
-            * ``(x,y,space_dim)`` -> ``(space_dim,x,y)`` is fine
-            * ``(x,y,1)`` ~ ``(x,y)`` -> ``(x,y)`` (1D case)
-
-    Args
-    ----
-        x : np.ndarray
-            the array to be casted
-    Returns:
-        tuple : an unpackable array
-
-    Example
-    -------
-        It can be used to define models:
-
-        >>> def log_prior(x):
-        >>>     x1,x2,x3 = unpack_variables(x)
-        >>>     return x1/x2*x3
-
-    warning
-    -------
-        It may be computationally expensive. Check for improvements.
-    '''
-    x = np.array(x)
-    # rotate the axis and remove 1 from shape
-    vars = x if not x.shape else np.moveaxis(x,-1,0).squeeze()
-    return vars
