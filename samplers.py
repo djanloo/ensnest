@@ -111,8 +111,9 @@ class AIESampler(Sampler):
         z        = self.get_stretch(size = self.nwalkers)
         proposal = pivot_position + z[:,None] * (current_walker_position - pivot_position)
 
-        log_prior_proposal = self.model.log_prior(proposal)
-        log_prior_current  = self.chain[self.elapsed_time_index, :]['logP']
+        log_prior_proposal      = self.model.log_prior(proposal)
+        log_likelihood_proposal = self.model.log_likelihood(proposal)
+        log_prior_current       = self.chain[self.elapsed_time_index, :]['logP']
 
         if not np.isfinite(log_prior_current).all():
             print(f'FATAL: past point is in impossible position')
@@ -120,7 +121,7 @@ class AIESampler(Sampler):
 
         #if a threshold Lmin is set, sets as 'impossible' the proposals outside
         if Lthreshold is not None:
-            log_prior_proposal[self.model.log_likelihood(proposal) < Lthreshold] = -np.inf
+            log_prior_proposal[log_likelihood_proposal < Lthreshold] = -np.inf
 
         log_accept_prob = ( self.model.space_dim - 1) * np.log(z) + log_prior_proposal - log_prior_current
 
@@ -132,7 +133,7 @@ class AIESampler(Sampler):
         #assigns accepted values
         self.chain['position'][self.elapsed_time_index+1, accepted] = proposal[accepted]
         self.chain['logP'][self.elapsed_time_index+1, accepted]     = log_prior_proposal[accepted]
-        self.chain['logL'][self.elapsed_time_index+1, accepted]     = self.model.log_likelihood(proposal[accepted])
+        self.chain['logL'][self.elapsed_time_index+1, accepted]     = log_likelihood_proposal[accepted]
         # copies rejected values
         self.chain[self.elapsed_time_index+1, np.logical_not(accepted)] = self.chain[self.elapsed_time_index, np.logical_not(accepted)]
         self.elapsed_time_index += 1
@@ -192,7 +193,7 @@ class AIESampler(Sampler):
 
         correct_ones = self.chain[self.elapsed_time_index, np.logical_not(is_duplicate)]
         new_point    = correct_ones[np.random.randint(self.nwalkers - n_duplicate)]
-        return new_point
+        return new_point, correct_ones
 
     def reset(self):
         self.elapsed_time_index = 0
