@@ -48,9 +48,10 @@ class Sampler:
 
         #uniform initialisation
         for walker in range(self.nwalkers):
-            self.chain[0, walker]['position']   = U(*self.model.bounds)
-            self.chain[0, walker]['logP']       = self.model.log_prior(self.chain[0, walker]['position'])
-            self.chain[0, walker]['logL']       = self.model.log_likelihood(self.chain[0, walker]['position'])
+            breakpoint()
+            self.chain['position'][0, walker]  = U(*self.model.bounds).view(self.model.position_t)
+            self.chain['logP'] [0, walker]      = self.model.log_prior(self.chain[0, walker]['position'])
+            self.chain['logL'][0, walker]       = self.model.log_likelihood(self.chain[0, walker]['position'])
 
 class AIESampler(Sampler):
     '''The Affine-Invariant Ensemble sampler (Goodman, Weare, 2010).

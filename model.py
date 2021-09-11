@@ -1,6 +1,7 @@
 import numpy as np
 import utils
 import functools
+from numpy.lib import recfunctions as rfn
 
 class Model:
     '''Class to describe models
@@ -100,6 +101,17 @@ class Model:
         if not (result1 == result2).any():
             raise ValueError('Bad-behaving log_likelihood: different results for different iteration order')
 
+    def destructure(func):
+        '''Helper function to manipulate data inside user-defined functins.
+
+            Reduces the internal structure of variables to a standard np.ndarray.
+            Useful when iterative operations have to be made upon the input.
+        '''
+        def _destructure_wrap(self, x):
+            return func(self, rfn.structured_to_unstructured(x))
+        return _destructure_wrap    
+
+    @destructure
     def is_inside_bounds(self,points):
             '''Checks if a point is inside the space bounds.
 
@@ -115,8 +127,6 @@ class Model:
                             The returned array has shape (\*,) = ``utils.pointshape(point)``
             '''
             shape = points.shape
-            #takes the structured points, position only, converts to (\*, space_dim)
-            points = points.copy().view(np.float64).reshape(-1, self.space_dim)
 
             is_coordinate_inside = np.logical_and(  points > self.bounds[0],
                                                     points < self.bounds[1])
