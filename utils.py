@@ -38,25 +38,3 @@ def logsumexp(arg):
             return result
     else:
         raise ValueError('argument is not an array')
-
-def pointshape(x, dim = None):
-    '''Gives the shape of an array of points of dimension ``space_dim``.
-    Basically pops the last item of ``x.shape`` and checks whether it's fine.
-
-
-    Args
-    ----
-        x : np.ndarray
-        dim : ``int``, optional
-            the space dimension
-    Returns:
-        tuple : the shape of x considering last axis made of ()-shaped items.
-    '''
-    shape = list(np.array(x).shape)
-    if not shape:
-        raise ValueError('Empty array')
-    last_index_dim = shape.pop()
-    if dim is not None:
-        if last_index_dim != dim:
-            raise IndexError(f'Point must have shape (*, space_dim = {dim}) but has shape {tuple(shape) + (last_index_dim,)}')
-    return tuple(shape)
