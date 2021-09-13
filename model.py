@@ -2,6 +2,7 @@ import numpy as np
 import utils
 import functools
 from timeit import default_timer as timer
+from numpy.lib import recfunctions as rfn
 
 class Model:
     '''Class to describe models
@@ -77,29 +78,29 @@ class Model:
 
         #checks for (time, walker, position)-like evaluation
         testshape = (4,3)
-        dummy = np.random.random(testshape + (self.space_dim,))
+        dummy1 = np.random.random(testshape + (self.space_dim,))
 
-        log_prior_result = self.log_prior(dummy)
+        log_prior_result = self.log_prior(dummy1)
 
         if not isinstance( log_prior_result, np.ndarray) or log_prior_result.shape != testshape:
-            raise ValueError(f'Bad-behaving log_prior:\ninput shape: {dummy.shape} \noutput shape: {self.log_prior(dummy).shape} (should be {testshape})')
+            raise ValueError(f'Bad-behaving log_prior:\ninput shape: {dummy1.shape} \noutput shape: {self.log_prior(dummy1).shape} (should be {testshape})')
 
-        if not isinstance(self.log_likelihood(dummy), np.ndarray) or self.log_likelihood(dummy).shape != testshape:
-            raise ValueError(f'Bad-behaving log_likelihood:\ninput shape: {dummy.shape}\noutput shape: {self.log_likelihood(dummy).shape} (should be {testshape})')
+        if not isinstance(self.log_likelihood(dummy1), np.ndarray) or self.log_likelihood(dummy1).shape != testshape:
+            raise ValueError(f'Bad-behaving log_likelihood:\ninput shape: {dummy1.shape}\noutput shape: {self.log_likelihood(dummy1).shape} (should be {testshape})')
 
         #checks for (time, position)-like evaluation
         #and iteration order differences
         testshape = (3,)
-        dummy = np.random.random(testshape + (self.space_dim,))
+        dummy2 = np.random.random(testshape + (self.space_dim,))
 
-        result1 = np.array([self.log_prior(_) for _ in dummy])
-        result2 = self.log_prior(dummy)
+        result1 = np.array([self.log_prior(_) for _ in dummy2])
+        result2 = self.log_prior(dummy2)
 
         if not (result1 == result2).any():
             raise ValueError('Bad-behaving log_prior: different results for different iteration order')
 
-        result1 = np.array([self.log_likelihood(_) for _ in dummy])
-        result2 = self.log_likelihood(dummy)
+        result1 = np.array([self.log_likelihood(_) for _ in dummy2])
+        result2 = self.log_likelihood(dummy2)
 
         if not (result1 == result2).any():
             raise ValueError('Bad-behaving log_likelihood: different results for different iteration order')
@@ -110,13 +111,13 @@ class Model:
 
         start = timer()
         for i in range(100):
-            dummy_result = self.log_prior(dummy)
+            dummy_result = self.log_prior(dummy_input)
         end = timer()
         self.log_prior_execution_time_estimate = (end - start)/100.
 
         start = timer()
         for i in range(100):
-            dummy_result = self.log_prior(dummy)
+            dummy_result = self.log_prior(dummy_input)
         end = timer()
         self.log_likelihood_execution_time_estimate = (end - start)/100.
 
@@ -126,6 +127,15 @@ class Model:
     def varenv(func):
         '''
         Helper function to index the variables by name inside user-defined functions
+
+        warning
+        -------
+            When using with ``@auto_bound``, it must be first:
+
+            >>> @auto_bound
+            >>> @varenv
+            >>> def f(self,x):
+            >>>     pass
         '''
         def _wrap(self,x,*args, **kwargs):
             x = x.view(self.position_t).squeeze()
@@ -147,10 +157,8 @@ class Model:
                             The returned array has shape (\*,) = ``utils.pointshape(point)``
             '''
             shape = np.array(points.shape)[:-1]
-
             is_coordinate_inside = np.logical_and(  points > self.bounds[0],
                                                     points < self.bounds[1])
-
             return is_coordinate_inside.all(axis = -1).reshape(shape)
 
     def log_chi(self, points):
@@ -207,3 +215,32 @@ class Model:
         def _autobound_wrapper(self,*args):
             return log_func(self,*args) + self.log_chi(*args)
         return _autobound_wrapper
+
+class ToyGaussian(Model):
+    def __init__(self,dim = 1):
+        self.bounds = (-np.ones(dim)*10 ,np.ones(dim)*10 )
+        self.names  = ['a']
+        super().__init__()
+
+    #@model.Model.varenv
+    @Model.auto_bound
+    def log_prior(self,x):
+        return 0#np.log(x['a'])
+
+    def log_likelihood(self,x):
+        return -0.5*np.sum(x**2,axis = -1)
+
+class UniformJeffreys(Model):
+    def __init__(self):
+        self.bounds = ([0.1,-10],[10,10])
+        self.names  = ['a','b']
+        self.center = np.array([3,0])
+        super().__init__()
+
+    @Model.auto_bound
+    @Model.varenv
+    def log_prior(self,x):
+        return np.log(1./x['a'])
+
+    def log_likelihood(self,x):
+        return -0.5*np.sum((x-self.center)**2,axis = -1)

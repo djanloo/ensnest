@@ -13,28 +13,14 @@ import samplers
 
 np.seterr(divide = 'ignore')
 
-class MyModel(model.Model):
-    def __init__(self):
-        self.bounds = (-np.ones(2)*10 ,np.ones(2)*10 )
-        self.names  = ['a','b']
-        super().__init__()
-
-    #@model.Model.varenv
-    @model.Model.auto_bound
-    def log_prior(self,x):
-        return 0#np.log(x['a'])
-
-    def log_likelihood(self,x):
-        return -0.5*np.sum(x**2,axis = -1)
-
 
 class NestedSampler:
 
     def __init__(self,model, nlive = 1000, npoints = None, evosteps = 70):
 
         self.model      = model
-        self.nlive      = 1000
-        self.evosteps   = 70
+        self.nlive      = nlive
+        self.evosteps   = evosteps
         self.logZ       = -np.inf
         self.logX       = None
         self.logL       = None
@@ -52,14 +38,14 @@ class NestedSampler:
         ng = [0]
         with tqdm(total = self.npoints) as pbar:
             while self.generated + self.nlive < self.npoints:
-                _, all , rel_duplicates = self.evo.get_new(self.points['logL'][self.generated])
+                _, all = self.evo.get_new(self.points['logL'][self.generated])
                 insert_index    = np.searchsorted(self.points['logL'],all['logL'])
                 self.points     = np.insert(self.points, insert_index, all)
                 self.points          = np.sort(self.points, order = 'logL')
                 self.evo.chain[0]    = self.points[-self.nlive:]
                 ng.append(len(all))
                 self.generated += len(all)
-                self.mean_duplicates_fraction += rel_duplicates
+                self.mean_duplicates_fraction += self.evo.duplicate_ratio
                 self.evo.elapsed_time_index = 0
                 pbar.update(len(all))
         self.logL = self.points['logL']
@@ -83,11 +69,9 @@ class NestedSampler:
         self.logZ = np.log(np.trapz(-np.exp(self.points['logL']), x = np.exp(logX)))
 
 
-
-
 def main():
-    my_model = MyModel()
-    ns = NestedSampler(my_model, nlive = 1000,  npoints = 10000, evosteps = 70)
+    my_model = model.ToyGaussian(2)
+    ns = NestedSampler(my_model, nlive = 10000,  npoints = 100000, evosteps = 70)
     ns.run()
     plt.plot(ns.logX,ns.logL)
     plt.show()
