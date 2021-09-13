@@ -116,6 +116,7 @@ class AIESampler(Sampler):
         log_prior_current       = self.chain[self.elapsed_time_index, :]['logP']
 
         if not np.isfinite(log_prior_current).all():
+            breakpoint()
             print(f'FATAL: past point is in impossible position')
             exit()
 
@@ -139,40 +140,7 @@ class AIESampler(Sampler):
         self.elapsed_time_index += 1
 
     def sample_prior(self, Lthreshold = None):
-        """Samples function.
-
-        The real problem for being used in NS is that it is not clear how
-        to treat an Ensemble of particles.
-
-        In vanilla NS one has a set of points {x1,---,xn}, chooses the worse, replace with another.
-
-        Here the evolution of the single particle itself depends on what others are doing.
-
-        One option could be (must be confirmed by theoretical calculations) taking the currentlive points and consider them as the ensemble,
-        then generate a new point like so.
-
-        The problem is that this sampler produces ``nwalker`` particles at a time, which means that the process would be:
-
-            * generate nlive from prior (can use this func)
-            * take worst
-            * generate OTHER (nlive - 1) points
-            * pick one of theese at random
-
-        which doesn't seem a reasonable way to follow.
-
-        Well, i could by the way proceed like this:
-
-            * generate nlive from prior (can use this func)
-            * take worst -> do stuff
-            * generate a bunch of points (say M)
-            * take M worst point -> do stuff
-
-        but i don't think it is how the vanilla NS should work, because
-        nlive is variable throughout the process. Check dynamic NS.
-
-        returns:
-            np.ndarray : the chain obtained
-
+        """Fills the chain by sampling the prior.
         """
         for t in range(self.length - 1):
             self.AIEStep(Lthreshold = Lthreshold)
@@ -180,6 +148,8 @@ class AIESampler(Sampler):
 
     def get_new(self,Lmin):
         '''Returns a new different point from prior given likelihood threshold
+
+        As for AIEStep, needs that every point is in a valid region.
         '''
         #generates nlive - 1 points over L>Lmin
         for t in range(1,self.length):
@@ -193,7 +163,7 @@ class AIESampler(Sampler):
 
         correct_ones = self.chain[self.elapsed_time_index, np.logical_not(is_duplicate)]
         new_point    = correct_ones[np.random.randint(self.nwalkers - n_duplicate)]
-        return new_point, correct_ones
+        return new_point, correct_ones, n_duplicate/self.nwalkers
 
     def reset(self):
         self.elapsed_time_index = 0

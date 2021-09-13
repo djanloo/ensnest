@@ -34,42 +34,52 @@ def main():
     npoints = 100000
     ng = [0]
     generated = 0
-    evosteps = 70
-
+    evosteps = 50
+    mean_duplicates_percentage = 0
     evo     = samplers.AIESampler(my_model, evosteps , nwalkers = nlive).sample_prior().tail_to_head()
     points  = np.sort(evo.chain[0], order='logL')
 
     with tqdm(total = npoints) as pbar:
-        while generated < npoints:
-            _, all          = evo.get_new(points['logL'][generated])
+        while generated + nlive < npoints:
+            _, all , rel_duplicates = evo.get_new(points['logL'][generated])
             insert_index    = np.searchsorted(points['logL'],all['logL'])
             points          = np.insert(points, insert_index, all)
             points          = np.sort(points, order = 'logL')
             evo.chain[0]    = points[-nlive:]
             ng.append(len(all))
             generated += len(all)
+            mean_duplicates_percentage += rel_duplicates
             evo.elapsed_time_index = 0
             pbar.update(len(all))
 
-    ng.append(nlive)
+    mean_duplicates_percentage /= (len(ng)-1)
+    print(f'mean duplicates {mean_duplicates_percentage*100} %')
     ng = np.array(ng)
 
     #generate the logX values
-    DeltaN = []
-    for i in tqdm(range(len(ng)), desc = 'calculating numbers'):
-        c = ng[i]
-        while c >= 0:
-            DeltaN.append(c)
-            c -= 1
-    DeltaN = np.array(DeltaN)
-    N = DeltaN + nlive
+    jumps = np.zeros(len(points))
+    N     = np.zeros(len(points))
+    current_index = 0
+    for ng_i in ng:
+        jumps[current_index] = ng_i
+        current_index += ng_i
+
+    N[0] = nlive
+    for i in range(1,len(N)):
+        N[i] = N[i-1] - 1+ jumps[i-1]
+
     logX = np.zeros(len(points))
-    print(f'len DeltaN = {len(DeltaN)} --- len points = {len(points)} ')
     for i in  tqdm(range(1,len(points)), desc = 'calculating logX'):
         logX[i] = logX[i-1] - 1/N[i]
+
+    plt.figure(2)
     Z = np.trapz(-np.exp(points['logL']), x = np.exp(logX))
-    print(f'logZ = {Z} , integral = {400*Z}')
-    plt.plot(logX, points['logL'], ls ='' ,marker = '.')
+    print(f'Z = {Z} , integral = {my_model.volume*Z}')
+    print(f'Vol = {my_model.volume}')
+    plt.plot(logX, points['logL'])
+    plt.figure(3)
+    plt.plot(logX, np.exp(logX + points['logL']))
+
     plt.show()
 
 
