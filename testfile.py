@@ -5,22 +5,72 @@ import test
 from utils  import *
 from matplotlib import pyplot as plt
 from numpy.random import uniform as U
+from bisect import bisect_left
+from tqdm import trange
+
+np.seterr(divide = 'ignore')
+
+class MyModel(model.Model):
+    def __init__(self):
+        bounds = np.ones(2)
+        self.bounds = (bounds*0.1 , 5*bounds)
+        super().__init__()
+
+    def log_prior(self,x):
+        x1,x2 = model.unpack_variables(x)
+        return np.log(1/x1)
+
+    def log_likelihood(self,x):
+        x = model.unpack_variables(x)
+        return -0.5*np.sum((x - 2)**2,axis = 0)
 
 
-bounds = np.ones(2)*5
-bounds = (-bounds , bounds)
+nlive = 100
+npoints = 100
 
-def log_prior(x):
-    x1, x2 = model.unpack_variables(x)
-    return np.log(np.sin(x1) + 2)
+my_model  = MyModel()
 
-def log_likelihood(x):
-    return np.log(np.abs(np.sum(x, axis = -1)))
+points = samplers.AIESampler(my_model, 100, nwalkers=nlive ).sample_function(my_model.log_prior).chain[99]
+logLs  = my_model.log_likelihood(points)
+
+points  = points[np.argsort(logLs)]
+logLs   = np.sort(logLs)
+
+evo_sampler  = samplers.AIESampler(my_model, 100, nwalkers = nlive-1)
 
 
-my_model = model.Model(log_prior, log_likelihood, bounds)
-sampler = samplers.AIESampler(my_model, 500, nwalkers = 10000)
+#start nesting
+for n_generated in trange(npoints):
 
-x = sampler.sample_prior().join_chains(burn_in = 0.1)
-plt.hist(x,bins = 100, histtype = 'step', density = True)
+    evo_sampler.chain[evo_sampler.elapsed_time_index] = points[n_generated+1:].copy()
+    new_point = evo_sampler.sample_over_threshold(logLs[n_generated])
+
+    #inserts the point in the right place of the ordered list
+    replace_index = bisect_left(logLs, my_model.log_likelihood(new_point))
+    logLs         = np.insert(logLs, replace_index , my_model.log_likelihood(new_point))
+    points        = np.insert(points,  replace_index,  new_point, axis = 0)
+
+    #reset the sampler
+    evo_sampler.reset()
+
+n_generated = npoints
+
+print(f'Now sampling over logL = {logLs[n_generated]}')
+
+npoints = 1000
+sample_over = np.zeros((npoints,my_model.space_dim))
+#at this point it has npoints values stored, last likelihood is greatest
+for i in trange(0, npoints):
+    evo_sampler.chain[evo_sampler.elapsed_time_index] = points[n_generated+1:].copy()
+    new_point = evo_sampler.sample_over_threshold(logLs[n_generated])
+
+    #inserts the point in the sample
+    sample_over[i] = new_point
+
+    #reset the sampler
+    evo_sampler.reset()
+
+plt.scatter(sample_over[:,0], sample_over[:,1],alpha = 0.5)
+
+
 plt.show()

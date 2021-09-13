@@ -1,5 +1,7 @@
 import numpy as np
 import utils
+import functools
+from timeit import default_timer as timer
 
 class Model:
     '''Class to describe models
@@ -19,31 +21,55 @@ class Model:
         The log_prior and logg_likelihood functions are user defined and must have **one argument only**.
 
         They also must be capable of managing (\*,\*, .., space_dimension )-shaped arrays,
-        so make sure every operation is done on the **-1 axis of input**.
+        so make sure every operation is done on the **-1 axis of input** or use ``Model.unpack_variables()``.
 
         If input is a single point of shape (space_dimension,) both the functions
         must return a float ( not a (1,)-shaped array )
 
     '''
-    def __init__(self, log_prior, log_likelihood, space_bounds):
-        '''Initialise the sampler.
-
-        By default the starting point of the markov chain are uniformly distributed over all space.
+    def __init__(self):
+        '''Initialise and checks the model
         '''
-        space_bounds = (np.array(space_bounds[0]).astype(float), np.array(space_bounds[1]).astype(float))
-        assert space_bounds[0].shape == space_bounds[1].shape, "Uncoherent space dimensions"
-
-        self.bounds          = space_bounds
-
-        self.log_prior       = lambda x: log_prior(x)       + self.log_chi(x)
-        self.log_likelihood  = lambda x: log_likelihood(x)  + self.log_chi(x)
+        self.bounds = (np.array(self.bounds[0]).astype(float), np.array(self.bounds[1]).astype(float))
+        if not hasattr(self, 'names'):
+            self.names = []
 
         try:
-            self.space_dim   = space_bounds[0].shape[0]
+            dim1 = self.bounds[0].shape[0]
+            dim2 = self.bounds[1].shape[0]
+            if dim1 == dim2:
+                self.space_dim = dim1
+            else:
+                print('Different space dimensions in bounds')
+                exit()
         except IndexError: #in case bounds is given of the form (n,m)
             self.space_dim   = 1
 
+        self.volume = np.prod(self.bounds[1] - self.bounds[0])
+        #defines the structure of the data used
+        #this semplifies the usage
+        #creates a list of dummy names to give to the variables
+        for i in range(self.space_dim - len(self.names)):
+            self.names.append('var%d'%i)
+
+        #defines the datatype used in variable environment (varenv)
+        #and output results
+        self.position_t  = np.dtype([ (name, np.float64) for name in self.names])
+
+        #defines the datatype used inside code
+        self.livepoint_t = np.dtype([
+                                ('position' , np.float64, (self.space_dim,)), #using the dtype position_t makes the rest of the code really silly
+                                ('logL'     , np.float64),
+                                ('logP'     , np.float64)
+                                ])
+
         self._check()
+
+    def log_likelihood(self,x):
+        raise NotImplementedError('log_likelihood not defined')
+
+    def log_prior(self, x):
+        raise NotImplementedError('log_prior not defined')
 
     def _check(self):
         '''Checks if log_prior and log_likelihood are well behaved in return shape
@@ -78,6 +104,34 @@ class Model:
         if not (result1 == result2).any():
             raise ValueError('Bad-behaving log_likelihood: different results for different iteration order')
 
+        #estimates the time required for the evaluation of log_likelihood and log_prior
+        testshape = (4,3)
+        dummy_input = np.random.random(testshape + (self.space_dim,))
+
+        start = timer()
+        for i in range(100):
+            dummy_result = self.log_prior(dummy)
+        end = timer()
+        self.log_prior_execution_time_estimate = (end - start)/100.
+
+        start = timer()
+        for i in range(100):
+            dummy_result = self.log_prior(dummy)
+        end = timer()
+        self.log_likelihood_execution_time_estimate = (end - start)/100.
+
+        print(f'Correctly initialised a {self.space_dim}-D model with \n\tT_prior      ~ {self.log_prior_execution_time_estimate*1e6:.2f} us\n\tT_likelihood ~ {self.log_likelihood_execution_time_estimate*1e6:.2f} us')
+
+
+    def varenv(func):
+        '''
+        Helper function to index the variables by name inside user-defined functions
+        '''
+        def _wrap(self,x,*args, **kwargs):
+            x = x.view(self.position_t).squeeze()
+            return func(self, x)
+        return _wrap
+
     def is_inside_bounds(self,points):
             '''Checks if a point is inside the space bounds.
 
@@ -92,15 +146,11 @@ class Model:
 
                             The returned array has shape (\*,) = ``utils.pointshape(point)``
             '''
-            shape = list(points.shape)
+            shape = np.array(points.shape)[:-1]
 
-            if shape.pop() != self.space_dim:
-                raise IndexError('Last axis must have len == space_dim')
+            is_coordinate_inside = np.logical_and(  points > self.bounds[0],
+                                                    points < self.bounds[1])
 
-            shape = tuple(shape)
-            list_of_points       = points.reshape(-1,self.space_dim)
-            is_coordinate_inside = np.logical_and(  list_of_points > self.bounds[0],
-                                                    list_of_points < self.bounds[1])
             return is_coordinate_inside.all(axis = -1).reshape(shape)
 
     def log_chi(self, points):
@@ -132,43 +182,28 @@ class Model:
         '''
         return np.logical_and((points > self.bounds[0]).all(axis = -1),(points < self.bounds[1]).all(axis = -1))
 
+    def auto_bound(log_func):
+        '''Decorator to bound functions.
 
-    def pointshape(self,x):
-        """ ``self`` shorthand for ``utils.pointshape(x, dim = self.space_dim)``
-        """
-        return utils.pointshape(x, dim = self.space_dim)
+        args
+        ----
+            log_func : function
+                A function for which ``self.log_func(x)`` is valid.
+
+        Returns:
+            function : the bounded function ``log_func(x) + log_chi(x)``
+
+        Example
+        -------
+
+            >>> class MyModel(model.Model):
+            >>>
+            >>>     @model.Model.auto_bound
+            >>>     def log_prior(x):
+            >>>         return x
 
 
-def unpack_variables(x):
-    '''Helper function that performs values shapecasting.
-
-    Given a ``np.ndarray`` of shape ``(n1,n2,--, space_dim)``
-    returns an unpackable array of shape ``(space_dim, n1,n2, --)``.
-
-    note
-    ----
-        if any of the n1, n2, -- other dimension is equal to one,
-        it gets squeezed as it is an unnecessary nesting.
-
-    Args
-    ----
-        x : np.ndarray
-            the array to be casted
-    Returns:
-        tuple : an unpackable array
-
-    Example
-    -------
-        It can be used to define models:
-
-        >>> def log_prior(x):
-        >>>     x1,x2,x3 = unpack_variables(x)
-        >>>     return x1/x2*x3
-
-    warning
-    -------
-        It may be computationally expensive. Check for improvements.
-    '''
-    x = np.array(x)
-    vars = x if not x.shape else np.moveaxis(x,-1,0).squeeze()
-    return vars
+        '''
+        def _autobound_wrapper(self,*args):
+            return log_func(self,*args) + self.log_chi(*args)
+        return _autobound_wrapper
