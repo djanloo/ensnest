@@ -36,7 +36,7 @@ class NestedSampler:
 
     def run(self):
         ng = [0]
-        with tqdm(total = self.npoints) as pbar:
+        with tqdm(total = self.npoints, desc = 'sampling') as pbar:
             while self.generated + self.nlive < self.npoints:
                 _, all = self.evo.get_new(self.points['logL'][self.generated])
                 insert_index    = np.searchsorted(self.points['logL'],all['logL'])
@@ -65,15 +65,21 @@ class NestedSampler:
         logX = np.zeros(len(self.points))
         for i in  tqdm(range(1,len(self.points)), desc = 'calculating logX'):
             logX[i] = logX[i-1] - 1/N[i]
+        logX = np.append(logX, [-np.inf])
+        self.logL = np.append(self.logL, [self.logL[-1]])
         self.logX = logX
-        self.logZ = np.log(np.trapz(-np.exp(self.points['logL']), x = np.exp(logX)))
+        self.logZ = np.log(np.trapz(-np.exp(self.logL), x = np.exp(logX)))
 
 
 def main():
-    my_model = model.ToyGaussian(2)
-    ns = NestedSampler(my_model, nlive = 10000,  npoints = 100000, evosteps = 70)
+    my_model = model.RosenBrock()
+    ns = NestedSampler(my_model, nlive = 1000,  npoints = 100000, evosteps = 70)
     ns.run()
     plt.plot(ns.logX,ns.logL)
+
+    plt.figure(2)
+    colors = np.array([0,0,1.])*np.linspace(0,1,len(ns.points))[:,None]
+    plt.scatter(ns.points['position'][:,0], ns.points['position'][:,1], c = ns.points['logL'], cmap = 'plasma', alpha = 0.5)
     plt.show()
 
 
