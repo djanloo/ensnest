@@ -1,7 +1,7 @@
 import numpy as np
 import utils
 import functools
-from numpy.lib import recfunctions as rfn
+from timeit import default_timer as timer
 
 class Model:
     '''Class to describe models
@@ -45,6 +45,7 @@ class Model:
         except IndexError: #in case bounds is given of the form (n,m)
             self.space_dim   = 1
 
+        self.volume = np.prod(self.bounds[1] - self.bounds[0])
         #defines the structure of the data used
         #this semplifies the usage
         #creates a list of dummy names to give to the variables
@@ -103,6 +104,25 @@ class Model:
         if not (result1 == result2).any():
             raise ValueError('Bad-behaving log_likelihood: different results for different iteration order')
 
+        #estimates the time required for the evaluation of log_likelihood and log_prior
+        testshape = (4,3)
+        dummy_input = np.random.random(testshape + (self.space_dim,))
+
+        start = timer()
+        for i in range(100):
+            dummy_result = self.log_prior(dummy)
+        end = timer()
+        self.log_prior_execution_time_estimate = (end - start)/100.
+
+        start = timer()
+        for i in range(100):
+            dummy_result = self.log_prior(dummy)
+        end = timer()
+        self.log_likelihood_execution_time_estimate = (end - start)/100.
+
+        print(f'Correctly initialised a {self.space_dim}-D model with \n\tT_prior      ~ {self.log_prior_execution_time_estimate*1e6:.2f} us\n\tT_likelihood ~ {self.log_likelihood_execution_time_estimate*1e6:.2f} us')
+
+
     def varenv(func):
         '''
         Helper function to index the variables by name inside user-defined functions
@@ -130,7 +150,7 @@ class Model:
 
             is_coordinate_inside = np.logical_and(  points > self.bounds[0],
                                                     points < self.bounds[1])
-                                                    
+
             return is_coordinate_inside.all(axis = -1).reshape(shape)
 
     def log_chi(self, points):
