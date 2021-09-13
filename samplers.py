@@ -80,6 +80,8 @@ class AIESampler(Sampler):
             print('space scale parameter must be > 1: set 2x')
             self.space_scale *= 2
 
+        self.duplicate_ratio = 1.
+
     def get_stretch(self, size = 1):
         '''
         Generates the stretch values given the scale_parameter ``a``.
@@ -139,6 +141,7 @@ class AIESampler(Sampler):
         self.chain[self.elapsed_time_index+1, np.logical_not(accepted)] = self.chain[self.elapsed_time_index, np.logical_not(accepted)]
         self.elapsed_time_index += 1
 
+
     def sample_prior(self, Lthreshold = None):
         """Fills the chain by sampling the prior.
         """
@@ -149,7 +152,15 @@ class AIESampler(Sampler):
     def get_new(self,Lmin):
         '''Returns a new different point from prior given likelihood threshold
 
-        As for AIEStep, needs that every point is in a valid region.
+        As for AIEStep, needs that every point is in a valid region (the border is included).
+
+        args
+        ----
+            Lmin : float
+                the threshold likelihood that a point must have to be accepted
+
+        Returns:
+            tuple : (new , correct) one of the evolved points and all the generated points
         '''
         #generates nlive - 1 points over L>Lmin
         for t in range(1,self.length):
@@ -159,11 +170,12 @@ class AIESampler(Sampler):
         is_duplicate    = (self.chain['logL'][self.elapsed_time_index] == self.chain['logL'][0][:,None]).any(axis = 0)
         n_duplicate     = np.sum(is_duplicate.astype(int))
 
-        if n_duplicate/self.nwalkers > 0.8: print(f'>>>>>>>>>>> WARNING: {int(n_duplicate/self.nwalkers*100)}% of duplicate(s) found')
+        self.duplicate_ratio = n_duplicate/self.nwalkers
+        if self.duplicate_ratio > 0.8: print(f'>>>>>>>>>>> WARNING: {int(self.duplicate_ratio*100)}% of duplicate(s) found')
 
         correct_ones = self.chain[self.elapsed_time_index, np.logical_not(is_duplicate)]
         new_point    = correct_ones[np.random.randint(self.nwalkers - n_duplicate)]
-        return new_point, correct_ones, n_duplicate/self.nwalkers
+        return new_point, correct_ones
 
     def reset(self):
         self.elapsed_time_index = 0
@@ -185,3 +197,39 @@ class AIESampler(Sampler):
                 Must be ``burn_in`` > 0 and ``burn_in`` < 1.
         '''
         return self.chain[int(burn_in*self.length):].flatten()
+
+if __name__ == '__main__':
+    ####tests if sampling over threshold is correct
+    import matplotlib.pyplot as plt
+    mymodel = model.UniformJeffreys()
+    nwalkers = 5000
+    evo = AIESampler(mymodel, 70, nwalkers = nwalkers)
+    points = np.sort(evo.chain[0], order = 'logL')
+    current_Lmin = points['logL'][0]
+    Lmin = -3.6
+    while current_Lmin < Lmin:
+        _, new = evo.get_new(current_Lmin)
+        points = np.append(points,new)
+        points = np.sort(points, order = 'logL')
+        evo.chain[0] = points[-nwalkers:]
+        current_Lmin = points[-nwalkers]['logL']
+        evo.elapsed_time_index = 0
+
+    final = AIESampler(mymodel, 1000, nwalkers = nwalkers)
+    final.chain[0] = evo.chain[0]
+    final.sample_prior(Lthreshold = Lmin)
+    points = final.join_chains(burn_in = .1)
+
+    # plt.scatter(points['position'][:,0],points['position'][:,1],alpha = 0.05)
+    # plt.xlim(mymodel.bounds[0][0], mymodel.bounds[1][0])
+    # plt.ylim(mymodel.bounds[0][1], mymodel.bounds[1][1])
+    plt.figure(2)
+    plt.hist(points['position'][:,0], bins=100, histtype = 'step', density = True)
+
+    x = points['position'][:,0]
+    x_ = np.linspace(np.min(x), np.max(x),1000)
+    p = 1./x_*np.sqrt(-2*Lmin -(x_- mymodel.center[0])**2)
+    N = np.trapz(p, x = x_)
+    p = p/N
+    plt.plot(x_,p)
+    plt.show()
