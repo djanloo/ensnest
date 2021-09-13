@@ -231,6 +231,7 @@ class ToyGaussian(Model):
         return -0.5*np.sum(x**2,axis = -1)
 
 class UniformJeffreys(Model):
+
     def __init__(self):
         self.bounds = ([0.1,-10],[10,10])
         self.names  = ['a','b']
@@ -244,3 +245,19 @@ class UniformJeffreys(Model):
 
     def log_likelihood(self,x):
         return -0.5*np.sum((x-self.center)**2,axis = -1)
+
+class RosenBrock(Model):
+
+    def __init__(self):
+        self.bounds = ([-10,-10],[10,10])
+        self.names  = ['1','2']
+        self.center = np.array([3,0])
+        super().__init__()
+
+    @Model.auto_bound
+    def log_prior(self,x):
+        return 0
+
+    @Model.varenv
+    def log_likelihood(self,x):
+        return - 5* (x['2'] - x['1']**2)**2 - 1./20*(1-x['1'])**2
