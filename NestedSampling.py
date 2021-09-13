@@ -30,7 +30,7 @@ class MyModel(model.Model):
 
 class NestedSampler:
 
-    def __init__(model, nlive = 1000, npoints = None, evosteps = 70):
+    def __init__(self,model, nlive = 1000, npoints = None, evosteps = 70):
 
         self.model      = model
         self.nlive      = 1000
@@ -48,97 +48,48 @@ class NestedSampler:
         #takes trace of how efficient is the sampling
         self.mean_duplicates_fraction= 0
 
-    def run():
-        ng = 0
-        with tqdm(total = npoints) as pbar:
-            while generated + nlive < npoints:
-                _, all , rel_duplicates = evo.get_new(points['logL'][generated])
-                insert_index    = np.searchsorted(points['logL'],all['logL'])
-                points          = np.insert(points, insert_index, all)
-                points          = np.sort(points, order = 'logL')
-                evo.chain[0]    = points[-nlive:]
+    def run(self):
+        ng = [0]
+        with tqdm(total = self.npoints) as pbar:
+            while self.generated + self.nlive < self.npoints:
+                _, all , rel_duplicates = self.evo.get_new(self.points['logL'][self.generated])
+                insert_index    = np.searchsorted(self.points['logL'],all['logL'])
+                self.points     = np.insert(self.points, insert_index, all)
+                self.points          = np.sort(self.points, order = 'logL')
+                self.evo.chain[0]    = self.points[-self.nlive:]
                 ng.append(len(all))
-                generated += len(all)
-                mean_duplicates_percentage += rel_duplicates
-                evo.elapsed_time_index = 0
+                self.generated += len(all)
+                self.mean_duplicates_fraction += rel_duplicates
+                self.evo.elapsed_time_index = 0
                 pbar.update(len(all))
-        self.logL = 
+        self.logL = self.points['logL']
         ng = np.array(ng)
         #generate the logX values
-        jumps = np.zeros(len(points))
-        N     = np.zeros(len(points))
+        jumps = np.zeros(len(self.points))
+        N     = np.zeros(len(self.points))
         current_index = 0
         for ng_i in ng:
             jumps[current_index] = ng_i
             current_index += ng_i
 
-        N[0] = nlive
+        N[0] = self.nlive
         for i in range(1,len(N)):
             N[i] = N[i-1] - 1+ jumps[i-1]
 
-        logX = np.zeros(len(points))
-        for i in  tqdm(range(1,len(points)), desc = 'calculating logX'):
+        logX = np.zeros(len(self.points))
+        for i in  tqdm(range(1,len(self.points)), desc = 'calculating logX'):
             logX[i] = logX[i-1] - 1/N[i]
-
-        self.logZ = np.log(np.trapz(-np.exp(points['logL']), x = np.exp(logX)))
+        self.logX = logX
+        self.logZ = np.log(np.trapz(-np.exp(self.points['logL']), x = np.exp(logX)))
 
 
 
 
 def main():
     my_model = MyModel()
-
-    nlive = 10000
-    npoints = 100000
-    ng = [0]
-    generated = 0
-    evosteps = 50
-    mean_duplicates_percentage = 0
-    evo     = samplers.AIESampler(my_model, evosteps , nwalkers = nlive).sample_prior().tail_to_head()
-    points  = np.sort(evo.chain[0], order='logL')
-
-    with tqdm(total = npoints) as pbar:
-        while generated + nlive < npoints:
-            _, all , rel_duplicates = evo.get_new(points['logL'][generated])
-            insert_index    = np.searchsorted(points['logL'],all['logL'])
-            points          = np.insert(points, insert_index, all)
-            points          = np.sort(points, order = 'logL')
-            evo.chain[0]    = points[-nlive:]
-            ng.append(len(all))
-            generated += len(all)
-            mean_duplicates_percentage += rel_duplicates
-            evo.elapsed_time_index = 0
-            pbar.update(len(all))
-
-
-    mean_duplicates_percentage /= (len(ng)-1)
-    print(f'mean duplicates {mean_duplicates_percentage*100} %')
-    ng = np.array(ng)
-
-    #generate the logX values
-    jumps = np.zeros(len(points))
-    N     = np.zeros(len(points))
-    current_index = 0
-    for ng_i in ng:
-        jumps[current_index] = ng_i
-        current_index += ng_i
-
-    N[0] = nlive
-    for i in range(1,len(N)):
-        N[i] = N[i-1] - 1+ jumps[i-1]
-
-    logX = np.zeros(len(points))
-    for i in  tqdm(range(1,len(points)), desc = 'calculating logX'):
-        logX[i] = logX[i-1] - 1/N[i]
-
-    plt.figure(2)
-    Z = np.trapz(-np.exp(points['logL']), x = np.exp(logX))
-    print(f'Z = {Z} , integral = {my_model.volume*Z}')
-    print(f'Vol = {my_model.volume}')
-    plt.plot(logX, points['logL'])
-    plt.figure(3)
-    plt.plot(logX, np.exp(logX + points['logL']))
-
+    ns = NestedSampler(my_model, nlive = 1000,  npoints = 10000, evosteps = 70)
+    ns.run()
+    plt.plot(ns.logX,ns.logL)
     plt.show()
 
 
