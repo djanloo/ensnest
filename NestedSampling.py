@@ -27,6 +27,64 @@ class MyModel(model.Model):
     def log_likelihood(self,x):
         return -0.5*np.sum(x**2,axis = -1)
 
+
+class NestedSampler:
+
+    def __init__(model, nlive = 1000, npoints = None, evosteps = 70):
+
+        self.model      = model
+        self.nlive      = 1000
+        self.evosteps   = 70
+        self.logZ       = -np.inf
+        self.logX       = None
+        self.logL       = None
+
+        #initialises the sampler (AIES is the only option currently)
+        self.evo    = samplers.AIESampler(self.model, evosteps , nwalkers = nlive).sample_prior().tail_to_head()
+        self.generated  = 0
+        self.npoints    = npoints
+        self.points     = np.sort(self.evo.chain[0], order = 'logL')
+
+        #takes trace of how efficient is the sampling
+        self.mean_duplicates_fraction= 0
+
+    def run():
+        ng = 0
+        with tqdm(total = npoints) as pbar:
+            while generated + nlive < npoints:
+                _, all , rel_duplicates = evo.get_new(points['logL'][generated])
+                insert_index    = np.searchsorted(points['logL'],all['logL'])
+                points          = np.insert(points, insert_index, all)
+                points          = np.sort(points, order = 'logL')
+                evo.chain[0]    = points[-nlive:]
+                ng.append(len(all))
+                generated += len(all)
+                mean_duplicates_percentage += rel_duplicates
+                evo.elapsed_time_index = 0
+                pbar.update(len(all))
+        self.logL = 
+        ng = np.array(ng)
+        #generate the logX values
+        jumps = np.zeros(len(points))
+        N     = np.zeros(len(points))
+        current_index = 0
+        for ng_i in ng:
+            jumps[current_index] = ng_i
+            current_index += ng_i
+
+        N[0] = nlive
+        for i in range(1,len(N)):
+            N[i] = N[i-1] - 1+ jumps[i-1]
+
+        logX = np.zeros(len(points))
+        for i in  tqdm(range(1,len(points)), desc = 'calculating logX'):
+            logX[i] = logX[i-1] - 1/N[i]
+
+        self.logZ = np.log(np.trapz(-np.exp(points['logL']), x = np.exp(logX)))
+
+
+
+
 def main():
     my_model = MyModel()
 
@@ -51,6 +109,7 @@ def main():
             mean_duplicates_percentage += rel_duplicates
             evo.elapsed_time_index = 0
             pbar.update(len(all))
+
 
     mean_duplicates_percentage /= (len(ng)-1)
     print(f'mean duplicates {mean_duplicates_percentage*100} %')
