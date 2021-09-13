@@ -137,3 +137,10 @@ old/
 articles/
 documentation/build/*
 !*/inknest.pdf
+*omit*
+omit/
+
+
+#c stuff by cython
+*.c
+*.html
