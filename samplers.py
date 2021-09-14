@@ -248,10 +248,10 @@ if __name__ == '__main__':
         from scipy.stats import kstest
         from  matplotlib import cm
         mymodel  = model.UniformJeffreys()
-        logL = -1.5
-        nwalkers = 1_000
-        totsamp = 100_000
-        samp     = AIESampler(mymodel, 100, nwalkers = nwalkers )
+        logL        = -3.8
+        nwalkers    = 956
+        totsamp     = 10_000
+        samp        = AIESampler(mymodel, 100, nwalkers = nwalkers, space_scale = 14)
         samp.bring_over_threshold(logL)
 
         plt.rc('font', size = 8)
@@ -259,20 +259,19 @@ if __name__ == '__main__':
 
         fig,(ax1,ax2)= plt.subplots(2)
 
-        nsteps = [150,100,50,5, 2]
+        nsteps = [2,6,18,54,162,486,486]
         samples = np.zeros((len(nsteps),totsamp))
         colors = cm.get_cmap('plasma')(np.linspace(1,0,len(nsteps)))
 
         for i,l in enumerate(nsteps):
             samp.set_length(l)
-            points = np.array([], dtype = mymodel.livepoint_t)
-            duplicate_ratio = []
+            points = samp.chain[0]
             start = timer()
             with tqdm(total = totsamp) as pbar:
                 while len(points) < totsamp:
                     _ , new = samp.get_new(logL)
-                    duplicate_ratio.append(samp.duplicate_ratio*100)
                     points = np.append(points,new)
+                    samp.chain[0] = points[-nwalkers:]
                     samp.elapsed_time_index = 0
                     pbar.update(len(new))
             time = timer() - start
@@ -294,16 +293,21 @@ if __name__ == '__main__':
         ax1.set_title ('Live points update distribution for various n_update')
 
         #cumulants
-        samples = np.sort(samples, axis = -1)
+        samples     = np.sort(samples, axis = -1)
+
+
+
         x_ = np.linspace(0,1,totsamp)
         for i in range(len(nsteps)):
-            plt.step(samples[i], x_, color = colors[i])
-        x_ = np.linspace(mymodel.center[0] - (-2*logL)**(1/2) + 0.01 ,mymodel.center[0] + (-2*logL)**(1/2) - 0.01  ,1000)
-        plt.plot(x_, np.cumsum(analytical(x_) * np.diff(x_)[0]),color = 'k' ,ls = ":")
+            plt.step(samples[i] , x_, color = colors[i])
+
+        x_ = np.linspace(mymodel.center[0] - (-2*logL)**(1/2) + 0.01 ,mymodel.center[0] + (-2*logL)**(1/2) - 0.01  ,totsamp)
+        analytical  = np.cumsum(analytical(x_) * np.diff(x_)[0])
+        plt.plot(x_, analytical,color = 'k' ,ls = ":")
 
         fig.tight_layout()
         plt.show()
-        print(kstest(samples[0],samples[1]))
+        print(kstest(samples[-1],samples[-2]))
 
 
 
