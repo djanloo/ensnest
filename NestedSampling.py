@@ -1,15 +1,13 @@
-import sys
 import numpy as np
-import model
-import test
-from utils  import *
-from matplotlib import pyplot as plt
-from numpy.random import uniform as U
-from numpy.lib import recfunctions as rfn
-from bisect import bisect_left
-from tqdm import trange,tqdm
 
+import model
 import samplers
+
+from matplotlib import pyplot as plt
+from tqdm import trange,tqdm
+from timeit import default_timer as time
+
+
 
 np.seterr(divide = 'ignore')
 
@@ -36,7 +34,7 @@ class NestedSampler:
 
     def run(self):
         ng = [0]
-        with tqdm(total = self.npoints, desc = 'sampling') as pbar:
+        with tqdm(total = self.npoints, desc = 'nested sampling') as pbar:
             while self.generated + self.nlive < self.npoints:
                 _, all = self.evo.get_new(self.points['logL'][self.generated])
                 insert_index    = np.searchsorted(self.points['logL'],all['logL'])
@@ -73,13 +71,18 @@ class NestedSampler:
 
 def main():
     my_model = model.RosenBrock()
-    ns = NestedSampler(my_model, nlive = 1000,  npoints = 100000, evosteps = 70)
+    nlive, npoints = 1_000, 100_000
+    ns = NestedSampler(my_model, nlive = nlive,  npoints = npoints, evosteps = 100)
+    start = time()
     ns.run()
-    plt.plot(ns.logX,ns.logL)
+    T = time() - start
+    plt.plot(ns.logX,np.exp(ns.logL + ns.logX))
 
     plt.figure(2)
-    colors = np.array([0,0,1.])*np.linspace(0,1,len(ns.points))[:,None]
-    plt.scatter(ns.points['position'][:,0], ns.points['position'][:,1], c = ns.points['logL'], cmap = 'plasma', alpha = 0.5)
+    plt.scatter(ns.points['position'][:,0], ns.points['position'][:,1], c = np.exp(ns.points['logL']), cmap = 'plasma')
+    plt.rc('font', size = 11)
+    plt.rc('font', family = 'serif')
+    plt.title(f'Rosenbrock model: {len(ns.points)} samples in {T:.1f} seconds')
     plt.show()
 
 

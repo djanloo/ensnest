@@ -16,6 +16,8 @@ from numpy.random import randint
 import model
 from tqdm import tqdm, trange
 
+from timeit import default_timer as timer
+
 class Sampler:
     """Produces samples from model.
 
@@ -80,7 +82,7 @@ class AIESampler(Sampler):
             print('space scale parameter must be > 1: set 2x')
             self.space_scale *= 2
 
-        self.duplicate_ratio = 1.
+        self.duplicate_ratio = None
 
     def get_stretch(self, size = 1):
         '''
@@ -142,11 +144,18 @@ class AIESampler(Sampler):
         self.elapsed_time_index += 1
 
 
-    def sample_prior(self, Lthreshold = None):
+    def sample_prior(self, Lthreshold = None, progress = False):
         """Fills the chain by sampling the prior.
         """
-        for t in range(self.length - 1):
-            self.AIEStep(Lthreshold = Lthreshold)
+        if progress:
+            desc = 'sampling prior'
+            if Lthreshold is not None:
+                desc += f' over logL > {Lthreshold:.2f}'
+            for t in tqdm(range(self.length - 1), desc = desc):
+                self.AIEStep(Lthreshold = Lthreshold)
+        else:
+            for t in range(self.length - 1):
+                self.AIEStep(Lthreshold = Lthreshold)
         return self
 
     def get_new(self,Lmin):
@@ -182,6 +191,10 @@ class AIESampler(Sampler):
         self.chain      = np.zeros((self.length, self.nwalkers) , dtype=self.model.livepoint_t).squeeze()
 
     def tail_to_head(self):
+        '''Helper function for doing continuous sampling.
+
+        Sets the end of the chain as the head and restarts elapsed time.
+        '''
         self.chain[0] = self.chain[self.elapsed_time_index]
         self.elapsed_time_index = 0
         return self
@@ -198,38 +211,102 @@ class AIESampler(Sampler):
         '''
         return self.chain[int(burn_in*self.length):].flatten()
 
+    def bring_over_threshold(self, logLthreshold):
+        '''Brings the sampler over threshold.
+
+        It is necessary to initialise the sampler before sampling over threshold.
+
+        args
+        ----
+            Lthreshold : float
+                the logarithm of the likelihood.
+        '''
+        logLmin = np.min(self.chain['logL'][0])
+        old_progress = logLthreshold/logLmin
+        with tqdm(total = 1, desc = 'bringing over threshold') as pbar:
+            while logLmin < logLthreshold:
+                sorted = np.sort(self.chain[0], order='logL')
+                logLmin   = sorted['logL'][0]
+                _, new = self.get_new(logLmin)
+                sorted = np.append(sorted, new)
+                sorted = np.sort(sorted, order='logL')
+                self.chain[0] = sorted[-self.nwalkers:]
+                self.elapsed_time_index = 0
+                pbar.update(logLthreshold/logLmin - old_progress)
+
+    def set_length(self, length):
+        old_length  = self.length
+        self.length = length
+        new_chain   = np.zeros((self.length, self.nwalkers) , dtype=self.model.livepoint_t).squeeze()
+        new_chain[:min(old_length, length)] = self.chain[:min(old_length, length)]
+        self.chain = new_chain
+
 if __name__ == '__main__':
+
+    def test1():
+        np.seterr(divide = 'ignore')
+        from scipy.stats import kstest
+        from  matplotlib import cm
+        mymodel  = model.UniformJeffreys()
+        logL = -3.6
+        nwalkers = 1_000
+        totsamp = 100_000
+        samp     = AIESampler(mymodel, 100, nwalkers = nwalkers )
+        samp.bring_over_threshold(logL)
+
+        plt.rc('font', size = 8)
+        plt.rc('font', family = 'serif')
+
+        fig,(ax1,ax2)= plt.subplots(2)
+
+        nsteps = [150,100,50,5, 2]
+        samples = np.zeros((len(nsteps),totsamp))
+        colors = cm.get_cmap('plasma')(np.linspace(1,0,len(nsteps)))
+
+        for i,l in enumerate(nsteps):
+            samp.set_length(l)
+            points = np.array([], dtype = mymodel.livepoint_t)
+            duplicate_ratio = []
+            start = timer()
+            with tqdm(total = totsamp) as pbar:
+                while len(points) < totsamp:
+                    _ , new = samp.get_new(logL)
+                    duplicate_ratio.append(samp.duplicate_ratio*100)
+                    points = np.append(points,new)
+                    samp.elapsed_time_index = 0
+                    pbar.update(len(new))
+            time = timer() - start
+            # plt.scatter(points['position'][:,0],points['position'][:,1],alpha = 0.05)
+            # plt.xlim(mymodel.bounds[0][0], mymodel.bounds[1][0])
+            # plt.ylim(mymodel.bounds[0][1], mymodel.bounds[1][1])
+            micros_per_sample = time/len(points)*1e6
+            samples[i,:] = points['position'][:totsamp,0]
+            ax1.hist(samples[i], bins=64, histtype = 'step', color = colors[i], density = True, label =f'{l:5}  ({micros_per_sample:5.1f} $\mu$s/samp)')
+
+        x_ = np.linspace(mymodel.center[0] - (-2*logL)**(1/2) + 0.01 ,mymodel.center[0] + (-2*logL)**(1/2) - 0.01  ,1000)
+        def analytical(x):
+            p = 1./x*np.sqrt(-2*logL -(x- mymodel.center[0])**2)
+            N = np.trapz(p, x = x)
+            return p/N
+
+        ax1.plot(x_,analytical(x_),label = 'analytical', color = 'k' ,ls = ":")
+        fig.legend(loc = 'upper right', bbox_to_anchor = (0.95,0.9))
+        ax1.set_title ('Live points update distribution for various n_update')
+
+        #cumulants
+        samples = np.sort(samples, axis = -1)
+        x_ = np.linspace(0,1,totsamp)
+        for i in range(len(nsteps)):
+            plt.step(samples[i], x_, color = colors[i])
+        x_ = np.linspace(mymodel.center[0] - (-2*logL)**(1/2) + 0.01 ,mymodel.center[0] + (-2*logL)**(1/2) - 0.01  ,1000)
+        plt.plot(x_, np.cumsum(analytical(x_) * np.diff(x_)[0]),color = 'k' ,ls = ":")
+
+        fig.tight_layout()
+        plt.show()
+        print(kstest(samples[0],samples[1]))
+
+
+
     ####tests if sampling over threshold is correct
     import matplotlib.pyplot as plt
-    mymodel = model.UniformJeffreys()
-    nwalkers = 5000
-    evo = AIESampler(mymodel, 70, nwalkers = nwalkers)
-    points = np.sort(evo.chain[0], order = 'logL')
-    current_Lmin = points['logL'][0]
-    Lmin = -3.6
-    while current_Lmin < Lmin:
-        _, new = evo.get_new(current_Lmin)
-        points = np.append(points,new)
-        points = np.sort(points, order = 'logL')
-        evo.chain[0] = points[-nwalkers:]
-        current_Lmin = points[-nwalkers]['logL']
-        evo.elapsed_time_index = 0
-
-    final = AIESampler(mymodel, 1000, nwalkers = nwalkers)
-    final.chain[0] = evo.chain[0]
-    final.sample_prior(Lthreshold = Lmin)
-    points = final.join_chains(burn_in = .1)
-
-    # plt.scatter(points['position'][:,0],points['position'][:,1],alpha = 0.05)
-    # plt.xlim(mymodel.bounds[0][0], mymodel.bounds[1][0])
-    # plt.ylim(mymodel.bounds[0][1], mymodel.bounds[1][1])
-    plt.figure(2)
-    plt.hist(points['position'][:,0], bins=100, histtype = 'step', density = True)
-
-    x = points['position'][:,0]
-    x_ = np.linspace(np.min(x), np.max(x),1000)
-    p = 1./x_*np.sqrt(-2*Lmin -(x_- mymodel.center[0])**2)
-    N = np.trapz(p, x = x_)
-    p = p/N
-    plt.plot(x_,p)
-    plt.show()
+    test1()
