@@ -248,7 +248,7 @@ if __name__ == '__main__':
         from scipy.stats import kstest
         from  matplotlib import cm
         mymodel  = model.UniformJeffreys()
-        logL = -3.6
+        logL = -1.5
         nwalkers = 1_000
         totsamp = 100_000
         samp     = AIESampler(mymodel, 100, nwalkers = nwalkers )
