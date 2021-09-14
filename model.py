@@ -1,8 +1,5 @@
 import numpy as np
-import utils
-import functools
 from timeit import default_timer as timer
-from numpy.lib import recfunctions as rfn
 
 class Model:
     '''Class to describe models
@@ -126,7 +123,10 @@ class Model:
 
     def varenv(func):
         '''
-        Helper function to index the variables by name inside user-defined functions
+        Helper function to index the variables by name inside user-defined functions.
+
+        Uses the names defined in the constructor of the model + var0,var1, ... for the one
+        which are left unspecified.
 
         warning
         -------
@@ -135,7 +135,8 @@ class Model:
             >>> @auto_bound
             >>> @varenv
             >>> def f(self,x):
-            >>>     pass
+            >>>      u = x['A']+x['mu']
+            >>>      ... do stuff
         '''
         def _wrap(self,x,*args, **kwargs):
             x = x.view(self.position_t).squeeze()
@@ -153,8 +154,6 @@ class Model:
                 np.ndarray : True if all the coordinates lie between bounds
 
                             False if at least one is outside.
-
-                            The returned array has shape (\*,) = ``utils.pointshape(point)``
             '''
             shape = np.array(points.shape)[:-1]
             is_coordinate_inside = np.logical_and(  points > self.bounds[0],
@@ -175,20 +174,11 @@ class Model:
             np.ndarray : 0 if all the coordinates lie between bounds
 
                     -``np.inf`` if at least one is outside
-
-                    The returned array has shape (\*,) = ``utils.pointshape(point)``
         '''
         is_inside   = self.is_inside_bounds(points)
         value       = np.zeros(is_inside.shape)
         value[np.logical_not(is_inside)] = -np.inf
         return value
-
-    def new_is_inside_bounds(self,points):
-        '''Same as ``is_inside_bounds``.
-
-        Shorter but slower (allegedly due to high processing time of numpy broadcasting).
-        '''
-        return np.logical_and((points > self.bounds[0]).all(axis = -1),(points < self.bounds[1]).all(axis = -1))
 
     def auto_bound(log_func):
         '''Decorator to bound functions.
@@ -215,6 +205,9 @@ class Model:
         def _autobound_wrapper(self,*args):
             return log_func(self,*args) + self.log_chi(*args)
         return _autobound_wrapper
+
+
+#some simple models useful for testing
 
 class ToyGaussian(Model):
     def __init__(self,dim = 1):
@@ -249,7 +242,7 @@ class UniformJeffreys(Model):
 class RosenBrock(Model):
 
     def __init__(self):
-        self.bounds = ([-10,-10],[10,10])
+        self.bounds = ([-10,-1],[10,10])
         self.names  = ['1','2']
         self.center = np.array([3,0])
         super().__init__()
