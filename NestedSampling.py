@@ -82,8 +82,7 @@ class NestedSampler:
         self.logX = np.zeros(len(self.points)+2)
         self.logL = np.zeros(len(self.points)+2)
 
-        for i in range(1,    len(self.points) + 1):
-            self.logX[i] = self.logX[i-1] - 1./self.N[i-1]
+        self.logX[1:-1] = -np.cumsum(1/self.N)
         self.logX[-1] = -np.inf
 
         # L =[0,L0, ... , L(n-1), L(n-1)] -> fills last block by duplicating the last L
@@ -107,9 +106,22 @@ class NestedSampler:
         # X[i] = worst among(N[i]) ~(det) exp(-1/N[i])
         # for each array of X calc Z
         # do this many times then avg Z over sample
-        logt = self.log_worst_t_among(self.N)
-        logt = np.insert(logt, 0, 0)
-        logX = np.cumsum(logt)
+
+        # actually, since log_worst_t_among is vestorized
+        # creates copies of N then do all together
+        Nexpanded = np.repeat([self.N], 10, axis = 0)
+        logt = self.log_worst_t_among(Nexpanded)
+
+        # ti = t(N[i])
+        #   X0 = t0*1
+        #   X1 = t1*X0 = t1*t0*1
+        #   X2 = t2*t1*t0 ecc.
+
+        #so logX0 = logt0
+        #   logX1 = logt0 + logt1
+        #   logX2 = logt0 + logt1 + logt2   ecc.
+        logX = np.cumsum(logt, axis = -1)
+        logX = np.insert(logX,[0,-1],[0, -np.inf], axis = -1)
         breakpoint()
 
 

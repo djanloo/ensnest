@@ -11,7 +11,7 @@ def check_constrained_distrib():
     nlive, npoints = 1_000, 80_000
     ns = NestedSampler(target, nlive = nlive,  npoints = npoints, evosteps = 200)
 
-    test_step = np.arange(1000,5000,1000)
+    test_step = np.arange(50,500,10)
     samp,times,ks_stats = ns.check_prior_sampling(-0.5, test_step , 100_000)
 
     xcol = cm.get_cmap('plasma') (np.linspace(1,0,len(test_step)))
