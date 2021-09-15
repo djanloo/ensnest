@@ -222,7 +222,7 @@ class AIESampler(Sampler):
                 the logarithm of the likelihood.
         '''
         logLmin = np.min(self.chain['logL'][0])
-        old_progress = logLthreshold/logLmin
+
         with tqdm(total = 1, desc = 'bringing over threshold') as pbar:
             while logLmin < logLthreshold:
                 sorted = np.sort(self.chain[0], order='logL')
@@ -232,7 +232,8 @@ class AIESampler(Sampler):
                 sorted = np.sort(sorted, order='logL')
                 self.chain[0] = sorted[-self.nwalkers:]
                 self.elapsed_time_index = 0
-                pbar.update(logLthreshold/logLmin - old_progress)
+                pbar.n = np.exp(min(logLmin, logLthreshold) - logLthreshold  )
+                pbar.refresh()
 
     def set_length(self, length):
         old_length  = self.length
