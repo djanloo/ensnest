@@ -25,9 +25,13 @@ class NestedSampler:
         self.logX       = None
         self.logL       = None
 
+        #since variable nlive is faster:
+        self.N          = None # ~N(t)
+        self.ngen       = None  # number of live points pumped in at each iteration
+        self.generated  = 0     # cumulant for ngen
+
         #initialises the sampler (AIES is the only option currently)
         self.evo    = samplers.AIESampler(self.model, evosteps , nwalkers = nlive).sample_prior().tail_to_head()
-        self.generated  = 0
         self.npoints    = npoints
         self.points     = np.sort(self.evo.chain[0], order = 'logL')
 
@@ -38,45 +42,101 @@ class NestedSampler:
 
     def run(self):
         start = time()
-        ng = [0]
+
+        #takes trace of the generated points in case duplicates are excluded
+        self.ngen = [0]
+
         with tqdm(total = self.npoints, desc='nested sampling', unit_scale=True , colour = 'blue') as pbar:
+
             while self.generated + self.nlive < self.npoints:
-                _, all = self.evo.get_new(self.points['logL'][self.generated])
+
+                _, all          = self.evo.get_new(self.points['logL'][self.generated])
                 insert_index    = np.searchsorted(self.points['logL'],all['logL'])
                 self.points     = np.insert(self.points, insert_index, all)
-                self.points          = np.sort(self.points, order = 'logL')
+                self.points          = np.sort(self.points, order = 'logL') #because searchsorted fails sometimes
                 self.evo.chain[0]    = self.points[-self.nlive:]
-                ng.append(len(all))
+                self.ngen.append(len(all))
                 self.generated += len(all)
-                self.mean_duplicates_fraction += self.evo.duplicate_ratio
-                self.evo.elapsed_time_index = 0
+                self.mean_duplicates_fraction   += self.evo.duplicate_ratio
+                self.evo.elapsed_time_index     = 0
                 pbar.update(len(all))
-        self.logL = self.points['logL']
-        ng = np.array(ng)
+
+        self.ngen = np.array(self.ngen)
+
         #generate the logX values
-        jumps = np.zeros(len(self.points))
-        N     = np.zeros(len(self.points))
+        jumps  = np.zeros(len(self.points), dtype=np.int)
+        self.N = np.zeros(len(self.points), dtype=np.int)
         current_index = 0
-        for ng_i in ng:
+        for ng_i in self.ngen:
             jumps[current_index] = ng_i
             current_index += ng_i
 
-        N[0] = self.nlive
-        for i in range(1,len(N)):
-            N[i] = N[i-1] - 1+ jumps[i-1]
+        self.N[0] = self.nlive
+        for i in range(1,len(self.N)):
+            self.N[i] = self.N[i-1] - 1 + jumps[i-1]
 
-        logX = np.zeros(len(self.points))
-        for i in  tqdm(range(1,len(self.points)), desc = 'computing logX'):
-            logX[i] = logX[i-1] - 1/N[i]
-        logX = np.append(logX, [-np.inf])
+        # X = [1,X0,..., X(n-1), 0]  -> n points + 2 'artificial'
+        # with X0 = worst among N[0] in (0,1)   ~ exp(-1/N[0])
+        #      X1 = worst among N[1] in (0,X0)  ~ exp(-1/N[0] - 1/N[1])
+        #      ecc
+        self.logX = np.zeros(len(self.points)+2)
+        self.logL = np.zeros(len(self.points)+2)
 
-        self.logL = np.append(self.logL, [self.logL[-1]])
-        self.logX = logX
-        self.logZ = np.log(np.trapz(-np.exp(self.logL), x = np.exp(logX)))
+        for i in range(1,    len(self.points) + 1):
+            self.logX[i] = self.logX[i-1] - 1./self.N[i-1]
+        self.logX[-1] = -np.inf
+
+        # L =[0,L0, ... , L(n-1), L(n-1)] -> fills last block by duplicating the last L
+        self.logL[1:-1] = self.points['logL']
+        self.logL[-1]   = self.logL[-2]
+        self.logL[0]    = -np.inf
+
+        self.logZ = np.log(np.trapz(-np.exp(self.logL), x = np.exp(self.logX)))
 
         self.run_time = time() - start
+        self.estimate_Zerror()
 
-    def check_prior_sampling(self, logL,evosteps,nsamples):
+    @np.vectorize
+    def log_worst_t_among(N):
+        '''Helper function to generate a shrink factors'''
+        return np.log(np.min(np.random.uniform(0,1, size = N)))
+
+    def estimate_Zerror(self):
+        '''Estimates the error sampling the shrink variables
+        '''
+        # X[i] = worst among(N[i]) ~(det) exp(-1/N[i])
+        # for each array of X calc Z
+        # do this many times then avg Z over sample
+        logt = self.log_worst_t_among(self.N)
+        logt = np.insert(logt, 0, 0)
+        logX = np.cumsum(logt)
+        breakpoint()
+
+
+
+
+    def check_prior_sampling(self, logL, evosteps, nsamples):
+        """Samples the prior over a given likelihood threshold with different steps of evolution.
+
+        Can be useful in estimating the steps necessary for convergence to the real distribution.
+
+        At first it brings the sample from being uniform to being over threshold,
+        then it evolves sampling over the threshold for ``evosteps[i]`` times,
+        then takes the last generated points (``sampler.chain[sampler.elapsed_time_index]``)
+        and adds them to the sample to be returned.
+
+        Args
+        ----
+            logL : float
+                the log of likelihood threshold
+            evosteps : ``int`` or array of ``int``
+                the steps of evolution performed for sampling
+            nsamples : int
+                the number of samples taken from ``sampler.chain[sampler.elapsed_time_index]``
+
+        Returns:
+            np.ndarray : samples
+        """
 
         evosteps = np.array(evosteps)
         samp     = samplers.AIESampler(self.model, 100, nwalkers = self.nlive)
@@ -86,11 +146,11 @@ class NestedSampler:
         samples      = np.zeros((len(evosteps),nsamples, self.model.space_dim))
         microtimes   = np.zeros(len(evosteps))
 
-        for i,length in enumerate(evosteps):
-            samp.set_length(length)
+        for i in range(len(evosteps)):
+            samp.set_length(evosteps[i])
             points  = samp.chain[0]
             start   = time()
-            with tqdm(total = nsamples, desc = f'[test] sampling prior (evosteps = {length:4})', colour = 'green') as pbar:
+            with tqdm(total = nsamples, desc = f'[test] sampling prior (evosteps = {evosteps[i]:4})', colour = 'green') as pbar:
                 while len(points) < nsamples:
                     _ , new = samp.get_new(logL)
                     points = np.append(points,new)
@@ -107,36 +167,3 @@ class NestedSampler:
                 ks_stats[run_i,axis] = pval
 
         return samples, microtimes, ks_stats
-
-
-def main():
-    my_model = model.RosenBrock()
-    nlive, npoints = 1_000, 50_000
-    ns = NestedSampler(my_model, nlive = nlive,  npoints = npoints, evosteps = 200)
-
-    # samp,times,ks_stats = ns.check_prior_sampling(-0.5, [5,5], 100_000)
-    # plt.hist(samp[0,:,0], bins = 50, histtype = 'step')
-    # plt.hist(samp[1,:,0], bins = 50, histtype = 'step')
-    # plt.show()
-    # print(ks_stats)
-
-    ns.run()
-    print(f'logZ = {ns.logZ}')
-    plt.plot(ns.logX,np.exp(ns.logL + ns.logX))
-
-    plt.figure(2)
-    plt.scatter(ns.points['position'][:,0], ns.points['position'][:,1], c = np.exp(ns.points['logL']), cmap = 'plasma')
-    plt.rc('font', size = 11)
-    plt.rc('font', family = 'serif')
-    plt.title(f'Rosenbrock model: {len(ns.points)} samples in {ns.run_time:.1f} seconds')
-
-    fig3d = plt.figure(3)
-    ax    = fig3d.add_subplot(projection = '3d')
-
-    ax.scatter(ns.points['position'][:,0],ns.points['position'][:,1],np.exp(ns.points['logL']), c = np.exp(ns.points['logL']), cmap = 'plasma')
-
-    plt.show()
-
-
-if __name__ == '__main__':
-    main()
