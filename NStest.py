@@ -51,11 +51,8 @@ def rosenbrocktest():
 
 
 def gaussiantest():
-    nlive, npoints = 1_000,5_000
+    nlive, npoints = 10,2500
     ns = NestedSampler(model.Gaussian(5), nlive = nlive, npoints = npoints, evosteps = 1000)
     ns.run()
-    plt.plot(ns.logX , ns.logL)
-    print(f'integral = {np.exp(ns.logZ)*model.Gaussian(5).volume}')
-    print(f'logX = {ns.logX}')
-    print(f'logL = {ns.logL}')
+    plt.plot(np.exp(ns.logL + ns.logX))
     plt.show()

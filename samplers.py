@@ -183,12 +183,16 @@ class AIESampler(Sampler):
         if self.duplicate_ratio > 0.8: print(f'>>>>>>>>>>> WARNING: {int(self.duplicate_ratio*100)}% of duplicate(s) found')
 
         correct_ones = self.chain[self.elapsed_time_index, np.logical_not(is_duplicate)]
-        new_point    = correct_ones[np.random.randint(self.nwalkers - n_duplicate)]
-        return new_point, correct_ones
+        #new_point    = correct_ones[np.random.randint(self.nwalkers - n_duplicate)]
+        return correct_ones
 
-    def reset(self):
+    def reset(self, start = None):
         self.elapsed_time_index = 0
-        self.chain      = np.zeros((self.length, self.nwalkers) , dtype=self.model.livepoint_t).squeeze()
+        self.chain              = np.zeros((self.length, self.nwalkers) , dtype=self.model.livepoint_t).squeeze()
+        if start is not None:
+            assert isinstance(start, np.ndarray),               'Chain start point is not a np.ndarray'
+            assert start.shape == (self.nwalkers,), 'Chain start point has wrong shape'
+            self.chain[0] = start
 
     def tail_to_head(self):
         '''Helper function for doing continuous sampling.
