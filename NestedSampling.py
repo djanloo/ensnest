@@ -22,13 +22,13 @@ class NestedSampler:
         self.nlive      = nlive
         self.evosteps   = evosteps
         self.logZ       = -np.inf
-        self.logX       = np.array([0., -1./nlive],        dtype=np.float64)
+        self.logX       = np.array([0., -1/self.nlive],        dtype=np.float64)
         self.logL       = np.array([-np.inf],   dtype=np.float64)
         self.dlogZ      = None
 
         #since variable nlive is faster:
         self.N          = np.array([self.nlive],dtype=np.int) # ~N(t)
-        self.ngen       = np.array([0],         dtype=np.int) # number of live points pumped in at each iteration could be non-constant
+        self.ngen       = np.array([1]         ,dtype=np.int) # number of live points pumped in at each iteration could be non-constant
         self.generated  = 1    # cumulant for ngen
 
         #initialises the sampler (AIES is the only option currently)
@@ -61,15 +61,10 @@ class NestedSampler:
                 self.evo.reset(start = self.points[-self.nlive:])      #restarts the sampler giving last live points as initial ensemble
                 self.ngen       = np.append(self.ngen, [len(new)] )
                 self.generated += len(new)
-
                 self.update()
                 pbar.update(len(new))
 
-        self.logZ = np.log(np.trapz(-np.exp(self.logL), x = np.exp(self.logX)))
-        print(f'det integral {np.exp(self.logZ)*self.model.volume}')
-
         self.run_time = time() - start
-        breakpoint()
         self.estimate_Zerror()
         print(f'Run finished: logZ = {self.logZ} +- {self.dlogZ}')
         print(f'stoch integral {np.exp(self.logZ)*self.model.volume} +- {np.exp(self.logZ)*self.model.volume*self.dlogZ}')
@@ -86,7 +81,7 @@ class NestedSampler:
         '''
         #checks if it is a normal update or a closure update
         print(f"log_max_fut_inc - logZ = {self.points['logL'][-1]+ self.logX[-1] - self.logZ}")
-        relative_increment_condition =  (self.points['logL'][-1]+ self.logX[-1] > np.log(self.relative_precision) + self.logZ)
+        relative_increment_condition =  (self.points['logL'][-1]+ self.logX[-1] -self.logZ > np.log(self.relative_precision))
         n_points_condition           =  (len(self.points) < self.npoints )
         self.run_again               =  relative_increment_condition and n_points_condition
 
@@ -100,17 +95,28 @@ class NestedSampler:
             Nmin      = 1
             sup_index = self.generated + self.nlive
 
-        local_N     = np.flip(np.arange( Nmin , Nmax, dtype = np.int))
-        local_logX  = self.logX[-1] - np.cumsum(1./local_N)
-        local_logL  = self.points['logL'][inf_index:sup_index]
-        self.dlogZ  = np.log(np.trapz( - np.exp(local_logL), x = np.exp(local_logX) ))
+        # generates the values of logX fro the newly killed cluster
+        cluster_N     = np.flip(np.arange( Nmin , Nmax, dtype = np.int))
+        cluster_logX  = self.logX[-1] - np.cumsum(1./cluster_N)
+        cluster_logL  = self.points['logL'][inf_index:sup_index]
+
+        if not self.run_again:
+            cluster_logX = np.append(cluster_logX , -np.inf)
+            cluster_logL = np.append(cluster_logL, cluster_logL[-1])
+
+        #the integration requires to add a previous value (area gaps otherwise)
+        _logX = np.insert(cluster_logX, 0, self.logX[-1])
+        _logL = np.insert(cluster_logL, 0, self.points['logL'][inf_index-1])
+
+        self.dlogZ  = np.log(np.trapz( - np.exp(_logL), x = np.exp(_logX) ))
         self.logZ   = np.logaddexp(self.logZ, self.dlogZ)
-        self.logX   = np.append(self.logX, local_logX)
-        self.logL   = np.append(self.logL, local_logL)
-        self.N      = np.append(self.N   , local_N)
 
-        plt.fill_between(local_logX, local_logL , -200 + 0*local_logL)
-
+        #registers the values
+        self.logX   = np.append(self.logX, cluster_logX)
+        self.logL   = np.append(self.logL, cluster_logL)
+        self.N      = np.append(self.N   , cluster_N)
+        print(np.exp(self.logZ)*self.model.volume)
+        plt.fill_between(_logX, _logL , -200 + 0*_logL, alpha = 0.5, color = 'red')
 
     def _log_worst_t_among(self,N):
         '''Helper function to generate shrink factors'''
@@ -138,7 +144,6 @@ class NestedSampler:
         # logt = self.log_worst_t_among_vec("I have no clue why this has to be put here", Nexpanded)
         print(f'required {time()-start}')
         logX = np.cumsum(logt, axis = -1)
-        logX = np.insert(logX,[0,-1],[0, -np.inf], axis = -1)
 
         logZ_samp  = np.log(-np.trapz(np.exp(self.logL), x = np.exp(logX)))
         self.logZ  = np.mean(logZ_samp)

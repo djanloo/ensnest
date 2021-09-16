@@ -51,7 +51,7 @@ def rosenbrocktest():
 
 
 def gaussiantest():
-    nlive, npoints = 10,2500
+    nlive, npoints = 10,25000
     ns = NestedSampler(model.Gaussian(5), nlive = nlive, npoints = npoints, evosteps = 1000)
     ns.run()
     plt.plot(np.exp(ns.logL + ns.logX))
