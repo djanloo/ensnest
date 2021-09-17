@@ -159,9 +159,12 @@ class AIESampler(Sampler):
         return self
 
     def get_new(self,Lmin):
-        '''Returns a new different point from prior given likelihood threshold
+        '''Returns ``nwalkers`` *different* point from prior given likelihood threshold.
 
         As for AIEStep, needs that every point is in a valid region (the border is included).
+
+        If the length of the sampler is not enough to ensure that all points are different
+        stretches it one step at a time. The stretch is *permanent*.
 
         args
         ----
@@ -169,22 +172,28 @@ class AIESampler(Sampler):
                 the threshold likelihood that a point must have to be accepted
 
         Returns:
-            tuple : (new , correct) one of the evolved points and all the generated points
+            np.ndarray : new generated points
         '''
-        #generates nlive - 1 points over L>Lmin
+        #evolves the sampler at the current length
         for t in range(1,self.length):
             self.AIEStep(Lthreshold = Lmin)
 
-        #selects one of this point give it's different from the given ones
-        is_duplicate    = (self.chain['logL'][self.elapsed_time_index] == self.chain['logL'][0][:,None]).any(axis = 0)
-        n_duplicate     = np.sum(is_duplicate.astype(int))
+        # this part requires a time-expensive check each loop
+        # but since it is permanent it will allegedly be performed once
+        while True:
+            #counts the duplicates
+            is_duplicate    = (self.chain['logL'][self.elapsed_time_index] == self.chain['logL'][0][:,None]).any(axis = 0) #time comsuming op
+            n_duplicate     = np.sum(is_duplicate.astype(int))
+            
+            if n_duplicate == 0:
+                break
+            else:
 
-        self.duplicate_ratio = n_duplicate/self.nwalkers
-        if self.duplicate_ratio > 0.8: print(f'>>>>>>>>>>> WARNING: {int(self.duplicate_ratio*100)}% of duplicate(s) found')
+                print('WARNING: chain extended')
+                self.set_length(self.length + 1)
+                self.AIEStep(Lthreshold = Lmin)
 
-        correct_ones = self.chain[self.elapsed_time_index, np.logical_not(is_duplicate)]
-        #new_point    = correct_ones[np.random.randint(self.nwalkers - n_duplicate)]
-        return correct_ones
+        return self.chain[self.elapsed_time_index]
 
     def reset(self, start = None):
         self.elapsed_time_index = 0

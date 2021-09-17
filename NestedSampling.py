@@ -16,136 +16,161 @@ np.seterr(divide = 'ignore')
 
 class NestedSampler:
 
-    def __init__(self,model, nlive = 1000, npoints = np.inf, evosteps = 70):
+    def __init__(self,model, nlive = 1000, npoints = np.inf, evosteps = 100):
 
         self.model      = model
         self.nlive      = nlive
         self.evosteps   = evosteps
+
         self.logZ       = -np.inf
-        self.logX       = np.array([0., -1/self.nlive],        dtype=np.float64)
+        self.logX       = np.array([0.],        dtype=np.float64)
         self.logL       = np.array([-np.inf],   dtype=np.float64)
+        self.N          = np.array([],          dtype=np.int)
         self.dlogZ      = None
 
-        #since variable nlive is faster:
-        self.N          = np.array([self.nlive],dtype=np.int) # ~N(t)
-        self.ngen       = np.array([1]         ,dtype=np.int) # number of live points pumped in at each iteration could be non-constant
-        self.generated  = 1    # cumulant for ngen
+        self.elapsed_clusters    =   0
+        self.N_continue          =   np.flip( np.append( np.arange(self.nlive, 2*self.nlive , dtype=np.int) , [self.nlive] ))
+        self.delta_logX_continue = - np.cumsum(1./self.N_continue)
+        self.N_closure           =   np.flip( np.arange(1, self.nlive+1, dtype=np.int) )
+        self.delta_logX_closure  = - np.cumsum(1./self.N_closure)
 
         #initialises the sampler (AIES is the only option currently)
         self.evo        = samplers.AIESampler(self.model, evosteps , nwalkers = nlive).sample_prior().tail_to_head()
         self.npoints    = npoints
         self.points     = np.sort(self.evo.chain[0], order = 'logL')
 
-        self.run_time   = np.inf
         self.run_again  = True
         self.logZ_error = None
-        self.relative_precision = 1e-2
+        self.relative_precision = 1e-4
+        self.dlogZ_max_estimate     = -np.inf
 
-        #opening Z increment: takes care of the first point as dZ = (1-X0)*L0
-        self.logZ += (1 - np.exp(-1/nlive))*np.exp(self.points['logL'][0])
+        self.run_time            = None
+        self.error_estimate_time = None
+
+        self.progress_test = np.array([])
 
     def run(self):
         start = time()
         plt.ion()
         plt.show()
-        with tqdm(total = self.npoints, desc='nested sampling', unit_scale=True , colour = 'blue') as pbar:
+        with tqdm(total = 1., desc='nested sampling', unit_scale=True , colour = 'blue') as pbar:
 
             #main loop
             while self.run_again:
 
-                new             = self.evo.get_new(self.points['logL'][self.generated])
+                new             = self.evo.get_new(self.points['logL'][ -self.nlive]) #counts nlive points from maxL, takes the L that contains all them
                 insert_index    = np.searchsorted(self.points['logL'],new['logL'])
                 self.points     = np.insert(self.points, insert_index, new)
                 self.points     = np.sort(self.points, order = 'logL') #because searchsorted fails sometimes
 
                 self.evo.reset(start = self.points[-self.nlive:])      #restarts the sampler giving last live points as initial ensemble
-                self.ngen       = np.append(self.ngen, [len(new)] )
-                self.generated += len(new)
                 self.update()
-                pbar.update(len(new))
-
+                pbar.n = self._compute_progress()
+                self.progress_test = np.append(self.progress_test, self._compute_progress())
+                pbar.refresh()
+        plt.plot(self.progress_test)
+        plt.show()
         self.run_time = time() - start
         self.estimate_Zerror()
-        print(f'Run finished: logZ = {self.logZ} +- {self.dlogZ}')
-        print(f'stoch integral {np.exp(self.logZ)*self.model.volume} +- {np.exp(self.logZ)*self.model.volume*self.dlogZ}')
+        print(f'Run finished: logZ = {self.logZ} +- {self.logZ_error}')
+        print(f'stoch integral {np.exp(self.logZ)*self.model.volume} +- {np.exp(self.logZ)*self.model.volume*self.logZ_error}')
+
+    def _compute_progress(self):
+        print(self.dlogZ_max_estimate - self.logZ)
+        return np.exp(self.dlogZ_max_estimate - self.logZ)
 
     def update(self):
         '''updates the value of Z given the current state.
 
         The number of live points is like:
 
-        nlive,(jump) ~2nlive, 2nlive-1, ... ,nlive, (jump) ~2nlive, ecc.
+        nlive,(jump) 2nlive, 2nlive-1, ... ,nlive, (jump) 2nlive, ecc.
 
         This function is called between each pair of jumps. Uses the last ngen value
         and appends N values.
+
+        Integration is performed between the two successive times at which N = nlive (extrema included)
+        so
+
+        cluster_N = [nlive, 2*nlive -1, ... , nlive]
+
+        cluster_N.shape = (nlive + 1)
         '''
         #checks if it is a normal update or a closure update
-        print(f"log_max_fut_inc - logZ = {self.points['logL'][-1]+ self.logX[-1] - self.logZ}")
-        relative_increment_condition =  (self.points['logL'][-1]+ self.logX[-1] -self.logZ > np.log(self.relative_precision))
+        self.dlogZ_max_estimate      = self.points['logL'][-1]+ self.logX[-1]
+        relative_increment_condition =  (self.dlogZ_max_estimate - self.logZ > np.log(self.relative_precision))
         n_points_condition           =  (len(self.points) < self.npoints )
         self.run_again               =  relative_increment_condition and n_points_condition
 
-        #if it is a closure includes also the last live points in the Z computation
-        Nmax        = self.N[-1]     + self.ngen[-1]
-        inf_index   = self.generated - self.ngen[-1]
         if self.run_again:
-            Nmin      = self.nlive
-            sup_index = self.generated
+            #integration values for logX, logL
+            #first point of cluster included
+            #last  point of cluster included
+            _logX = self.logX[-1] + self.delta_logX_continue
+            _logL = self.points['logL'][self.elapsed_clusters*self.nlive: (self.elapsed_clusters+1)*self.nlive + 1]
+
+            #storage values for logX, logL (to prevent from redundance)
+            #first point of cluster included
+            #last  point of cluster excluded, will be stored at next iter
+            self.logX = np.append(self.logX, _logX[:-1])
+            self.logL = np.append(self.logL, _logL[:-1])
+            self.N    = np.append(self.N,    self.N_continue[:-1])
         else:
-            Nmin      = 1
-            sup_index = self.generated + self.nlive
+            _logX = self.logX[-1] + self.delta_logX_closure
+            _logX = np.append(_logX, [-np.inf] )
 
-        # generates the values of logX fro the newly killed cluster
-        cluster_N     = np.flip(np.arange( Nmin , Nmax, dtype = np.int))
-        cluster_logX  = self.logX[-1] - np.cumsum(1./cluster_N)
-        cluster_logL  = self.points['logL'][inf_index:sup_index]
+            _logL = self.points['logL'][-self.nlive:]
+            _logL = np.append(_logL, [_logL[-1]])
 
-        if not self.run_again:
-            cluster_logX = np.append(cluster_logX , -np.inf)
-            cluster_logL = np.append(cluster_logL, cluster_logL[-1])
-
-        #the integration requires to add a previous value (area gaps otherwise)
-        _logX = np.insert(cluster_logX, 0, self.logX[-1])
-        _logL = np.insert(cluster_logL, 0, self.points['logL'][inf_index-1])
+            #stores everything, extrema included
+            self.logX = np.append(self.logX, _logX)
+            self.logL = np.append(self.logL, _logL)
+            self.N    = np.append(self.N,    self.N_closure )
 
         self.dlogZ  = np.log(np.trapz( - np.exp(_logL), x = np.exp(_logX) ))
         self.logZ   = np.logaddexp(self.logZ, self.dlogZ)
 
-        #registers the values
-        self.logX   = np.append(self.logX, cluster_logX)
-        self.logL   = np.append(self.logL, cluster_logL)
-        self.N      = np.append(self.N   , cluster_N)
-        print(np.exp(self.logZ)*self.model.volume)
-        plt.fill_between(_logX, _logL , -200 + 0*_logL, alpha = 0.5, color = 'red')
+        self.elapsed_clusters += 1
+        #print(np.exp(self.logZ)*self.model.volume)
 
-    def _log_worst_t_among(self,N):
-        '''Helper function to generate shrink factors'''
-        return np.log(np.max(np.random.uniform(0,1, size = N)))
+    def _log_worst_t_among_N(self):
+        '''Helper function to generate shrink factors
+
+        Since max({t}) with t in [0,1], len({t}) = N
+        is distributed as Nt**(N-1), the cumulative function is y = t**(N)
+        and sampling uniformly over y gives the desired sample.
+
+        Therefore, max({t}) is equiv to (unif)**(1/N)
+
+        and log(unif**(1/N)) = 1/N*log(unif)
+        '''
+        return 1./self.N*np.log(np.random.uniform(0,1, size = len(self.N)))
 
     def estimate_Zerror(self):
         '''Estimates the error sampling t.
 
         Very slow.
         '''
-        # X[i] = worst among(N[i]) ~(det) exp(-1/N[i])
-        # for each array of X calc Z
-        # do this many times then avg Z over sample
-
-        Ntimes = 10
-        #-------------------------------
+        Ntimes = 1000
         start = time()
-        Nexpanded = np.tile(self.N, Ntimes)
-        breakpoint()
-        logt = np.array([self._log_worst_t_among(n) for _ , n in tqdm(np.ndenumerate(Nexpanded), total = Ntimes*len(self.N) ,desc = 'estimating error on logZ')])
-        logt = logt.reshape(-1,len(self.N))
-        #----------------------------------
-        # Nexpanded = np.repeat([self.N],Ntimes, axis = 0)
-        #
-        # logt = self.log_worst_t_among_vec("I have no clue why this has to be put here", Nexpanded)
-        print(f'required {time()-start}')
-        logX = np.cumsum(logt, axis = -1)
 
-        logZ_samp  = np.log(-np.trapz(np.exp(self.logL), x = np.exp(logX)))
+        #Nexpanded = np.tile(self.N, Ntimes)
+        #logt = np.array([self._log_worst_t_among(n) for _ , n in tqdm(np.ndenumerate(Nexpanded), total = Ntimes*len(self.N) ,desc = 'estimating error on logZ')])
+        #logt = logt.reshape(-1,len(self.N))
+        logt = np.zeros((Ntimes, len(self.N)))
+        for i in tqdm(range(Ntimes), desc = 'generating t-samples'):
+            logt[i] = self._log_worst_t_among_N()
+
+        self.error_estimate_time = time()-start
+
+        logX = np.cumsum(logt, axis = -1)
+        logX = np.insert(logX,logX.shape[1], -np.inf, axis = 1)
+        logX = np.insert(logX,0,0,axis = -1)
+
+        logZ_samp  = np.zeros(Ntimes)
+        for i in tqdm(range(Ntimes), 'computing Z samples'):
+            logZ_samp[i]  = np.log(-np.trapz(np.exp(self.logL), x = np.exp(logX[i])))
+
         self.logZ  = np.mean(logZ_samp)
         self.logZ_error = np.std (logZ_samp)
 
