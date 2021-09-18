@@ -51,10 +51,10 @@ def rosenbrocktest():
 
 
 def gaussiantest():
-    nlive, npoints = 100,10000000
-    ns = NestedSampler(model.Gaussian(5), nlive = nlive, npoints = npoints, evosteps = 1000)
+    nlive, npoints = 5000,10000000
+    ns = NestedSampler(model.Gaussian(50), nlive = nlive, npoints = npoints, evosteps = 8_000)
     ns.run()
     print(f'NS time {ns.run_time}')
     print(f'EE time {ns.error_estimate_time}')
-    plt.plot(np.exp(ns.logL + ns.logX))
+    print(f'integral = {np.exp(ns.logZ)*ns.model.volume}  +- {np.exp(ns.logZ)*ns.logZ_error*ns.model.volume}')
     plt.show()

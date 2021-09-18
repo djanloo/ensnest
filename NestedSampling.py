@@ -2,6 +2,7 @@ import numpy as np
 
 import model
 import samplers
+import utils
 
 from matplotlib import pyplot as plt
 from tqdm import trange,tqdm
@@ -26,7 +27,7 @@ class NestedSampler:
         self.logX       = np.array([0.],        dtype=np.float64)
         self.logL       = np.array([-np.inf],   dtype=np.float64)
         self.N          = np.array([],          dtype=np.int)
-        self.dlogZ      = None
+        self.logdZ      = None
 
         self.elapsed_clusters    =   0
         self.N_continue          =   np.flip( np.append( np.arange(self.nlive, 2*self.nlive , dtype=np.int) , [self.nlive] ))
@@ -35,14 +36,17 @@ class NestedSampler:
         self.delta_logX_closure  = - np.cumsum(1./self.N_closure)
 
         #initialises the sampler (AIES is the only option currently)
-        self.evo        = samplers.AIESampler(self.model, evosteps , nwalkers = nlive).sample_prior().tail_to_head()
+        self.evo        = samplers.AIESampler(self.model, evosteps , nwalkers = nlive).sample_prior(progress=True).tail_to_head()
         self.npoints    = npoints
         self.points     = np.sort(self.evo.chain[0], order = 'logL')
+
+        #integrate the first zone: (1-X0)*L0
+        self.logZ = utils.logsubexp(0,-1./self.nlive) + self.points['logL'][0]
 
         self.run_again  = True
         self.logZ_error = None
         self.relative_precision = 1e-4
-        self.dlogZ_max_estimate     = -np.inf
+        self.logdZ_max_estimate = None
 
         self.run_time            = None
         self.error_estimate_time = None
@@ -68,16 +72,13 @@ class NestedSampler:
                 pbar.n = self._compute_progress()
                 self.progress_test = np.append(self.progress_test, self._compute_progress())
                 pbar.refresh()
-        plt.plot(self.progress_test)
         plt.show()
         self.run_time = time() - start
         self.estimate_Zerror()
-        print(f'Run finished: logZ = {self.logZ} +- {self.logZ_error}')
-        print(f'stoch integral {np.exp(self.logZ)*self.model.volume} +- {np.exp(self.logZ)*self.model.volume*self.logZ_error}')
 
     def _compute_progress(self):
-        print(self.dlogZ_max_estimate - self.logZ)
-        return np.exp(self.dlogZ_max_estimate - self.logZ)
+        #print(np.exp(self.logZ - self.logdZ_max_estimate )*self.relative_precision)
+        return np.exp(self.logZ - self.logdZ_max_estimate )*self.relative_precision
 
     def update(self):
         '''updates the value of Z given the current state.
@@ -97,8 +98,8 @@ class NestedSampler:
         cluster_N.shape = (nlive + 1)
         '''
         #checks if it is a normal update or a closure update
-        self.dlogZ_max_estimate      = self.points['logL'][-1]+ self.logX[-1]
-        relative_increment_condition =  (self.dlogZ_max_estimate - self.logZ > np.log(self.relative_precision))
+        self.logdZ_max_estimate      = self.points['logL'][-1]+ self.logX[-1]
+        relative_increment_condition =  (self.logdZ_max_estimate - self.logZ > np.log(self.relative_precision))
         n_points_condition           =  (len(self.points) < self.npoints )
         self.run_again               =  relative_increment_condition and n_points_condition
 
@@ -127,11 +128,10 @@ class NestedSampler:
             self.logL = np.append(self.logL, _logL)
             self.N    = np.append(self.N,    self.N_closure )
 
-        self.dlogZ  = np.log(np.trapz( - np.exp(_logL), x = np.exp(_logX) ))
-        self.logZ   = np.logaddexp(self.logZ, self.dlogZ)
+        self.logdZ  = np.log(np.trapz( - np.exp(_logL), x = np.exp(_logX) ))
+        self.logZ   = np.logaddexp(self.logZ, self.logdZ)
 
         self.elapsed_clusters += 1
-        #print(np.exp(self.logZ)*self.model.volume)
 
     def _log_worst_t_among_N(self):
         '''Helper function to generate shrink factors
