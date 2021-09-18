@@ -94,16 +94,26 @@ class AIESampler(Sampler):
         '''
         return (U(0,1, size = size )*(self.space_scale**(1/2) - self.space_scale**(-1/2) ) + self.space_scale**(-1/2) )**2
 
-    def AIEStep(self, Lthreshold = None):
+    def AIEStep(self, Lthreshold=None, continuous=False):
         '''Single step of AIESampler.
 
             Args
             ----
                 Lthreshold : float, optional
                     The threshold of likelihood below which a point is set as impossible to reach
+                continuous : ``bool``, optional
+                    If true use modular index assignment, overwriting past values as
+                    ``self.elapsed_time_index`` > ``self.length``
         '''
+        t_now  = self.elapsed_time_index
+        t_next = self.elapsed_time_index + 1
+
+        if continuous:
+            t_now  = t_now  % self.length
+            t_next = t_next % self.length
+
         #considers the whole ensamble at at time
-        current_walker_position = self.chain[self.elapsed_time_index,:]['position']
+        current_walker_position = self.chain[t_now,:]['position']
 
         #OPTIMIZATION: np.random.randint is really slow
         #generate a number from 1 to self.nwalkers-1
@@ -111,14 +121,14 @@ class AIESampler(Sampler):
 
         #for each walker selects randomly another walker as a pivot for the stretch move
         pivot_index     = (np.arange(self.nwalkers) + delta_index   ) % self.nwalkers
-        pivot_position  = self.chain[self.elapsed_time_index, pivot_index]['position']
+        pivot_position  = self.chain[t_now, pivot_index]['position']
 
         z        = self.get_stretch(size = self.nwalkers)
         proposal = pivot_position + z[:,None] * (current_walker_position - pivot_position)
 
         log_prior_proposal      = self.model.log_prior(proposal)
         log_likelihood_proposal = self.model.log_likelihood(proposal)
-        log_prior_current       = self.chain[self.elapsed_time_index, :]['logP']
+        log_prior_current       = self.chain[t_now, :]['logP']
 
         if not np.isfinite(log_prior_current).all():
             breakpoint()
@@ -137,13 +147,13 @@ class AIESampler(Sampler):
         accepted = (log_accept_prob > np.log(U(0,1,size = self.nwalkers)))
 
         #assigns accepted values
-        self.chain['position'][self.elapsed_time_index+1, accepted] = proposal[accepted]
-        self.chain['logP'][self.elapsed_time_index+1, accepted]     = log_prior_proposal[accepted]
-        self.chain['logL'][self.elapsed_time_index+1, accepted]     = log_likelihood_proposal[accepted]
-        # copies rejected values
-        self.chain[self.elapsed_time_index+1, np.logical_not(accepted)] = self.chain[self.elapsed_time_index, np.logical_not(accepted)]
-        self.elapsed_time_index += 1
+        self.chain['position'][t_next, accepted] = proposal[accepted]
+        self.chain['logP'][t_next, accepted] = log_prior_proposal[accepted]
+        self.chain['logL'][t_next, accepted] = log_likelihood_proposal[accepted]
 
+        # copies rejected values
+        self.chain[t_next, np.logical_not(accepted)] = self.chain[t_now, np.logical_not(accepted)]
+        self.elapsed_time_index = t_next
 
     def sample_prior(self, Lthreshold = None, progress = False):
         """Fills the chain by sampling the prior.
@@ -159,59 +169,16 @@ class AIESampler(Sampler):
                 self.AIEStep(Lthreshold = Lthreshold)
         return self
 
-    def get_new(self,Lmin):
-        '''Returns ``nwalkers`` *different* point from prior given likelihood threshold.
-
-        As for AIEStep, needs that every point is in a valid region (the border is included).
-
-        If the length of the sampler is not enough to ensure that all points are different
-        stretches it one step at a time. The stretch is *permanent*.
-
-        args
-        ----
-            Lmin : float
-                the threshold likelihood that a point must have to be accepted
-
-        Returns:
-            np.ndarray : new generated points
-        '''
-        #evolves the sampler at the current length
-        for t in tqdm(range(self.elapsed_time_index,self.length-1), leave = False, desc = 'evolving'):
-            self.AIEStep(Lthreshold = Lmin)
-
-        # this part requires a time-expensive check each loop
-        # but since it is permanent it will allegedly be performed once
-        while True:
-            #counts the duplicates
-            is_duplicate    = (self.chain['logL'][self.elapsed_time_index] == self.chain['logL'][0][:,None]).any(axis = 0) #time comsuming op
-            n_duplicate     = np.sum(is_duplicate.astype(int))
-
-            if n_duplicate == 0:
-                break
-            else:
-
-                print(f'WARNING: chain extended to {2*self.length}')
-                self.set_length(2*self.length)
-                self.get_new(Lmin)
-
-        return self.chain[self.elapsed_time_index]
-
     def reset(self, start = None):
         self.elapsed_time_index = 0
-        self.chain              = np.zeros((self.length, self.nwalkers) , dtype=self.model.livepoint_t).squeeze()
+        self.chain              = np.ones((self.length, self.nwalkers) , dtype=self.model.livepoint_t).squeeze()
         if start is not None:
-            assert isinstance(start, np.ndarray),               'Chain start point is not a np.ndarray'
+            assert isinstance(start, np.ndarray),   'Chain start point is not a np.ndarray'
             assert start.shape == (self.nwalkers,), 'Chain start point has wrong shape'
-            self.chain[0] = start
-
-    def tail_to_head(self):
-        '''Helper function for doing continuous sampling.
-
-        Sets the end of the chain as the head and restarts elapsed time.
-        '''
-        self.chain[0] = self.chain[self.elapsed_time_index]
-        self.elapsed_time_index = 0
-        return self
+            self.chain[self.elapsed_time_index] = start
+        else:
+            print('DBG: restarting from nothing')
+            exit()
 
     def join_chains(self, burn_in = 0.02):
         '''Joins the chains for the ensemble after removing  ``burn_in`` \% of each single_particle chain.
@@ -236,12 +203,12 @@ class AIESampler(Sampler):
                 the logarithm of the likelihood.
         '''
         logLmin = np.min(self.chain['logL'][0])
-
+        print('ERROR: this function is no longer available due to branching to AIEevolver')
         with tqdm(total = 1, desc = 'bringing over threshold') as pbar:
             while logLmin < logLthreshold:
                 sorted = np.sort(self.chain[0], order='logL')
                 logLmin   = sorted['logL'][0]
-                _, new = self.get_new(logLmin)
+                new    = self.get_new(logLmin)
                 sorted = np.append(sorted, new)
                 sorted = np.sort(sorted, order='logL')
                 self.chain[0] = sorted[-self.nwalkers:]
@@ -256,76 +223,66 @@ class AIESampler(Sampler):
         new_chain[:min(old_length, length)] = self.chain[:min(old_length, length)]
         self.chain = new_chain
 
-if __name__ == '__main__':
+class AIEevolver(AIESampler):
+    '''Class to override some functionalities of the sampler
+    in case only the final state is of interest.
 
-    def test1():
-        np.seterr(divide = 'ignore')
-        from scipy.stats import kstest
-        from  matplotlib import cm
-        mymodel  = model.UniformJeffreys()
-        logL        = -3.8
-        nwalkers    = 956
-        totsamp     = 10_000
-        samp        = AIESampler(mymodel, 100, nwalkers = nwalkers, space_scale = 14)
-        samp.bring_over_threshold(logL)
+    The main difference from AIESampler is that ``lenght`` and ``steps`` can be different
 
-        plt.rc('font', size = 8)
-        plt.rc('font', family = 'serif')
+    '''
+    def __init__(self, model, steps, length = None, nwalkers=10, verbosity=0):
 
-        fig,(ax1,ax2)= plt.subplots(2)
+        if length == None:
+            length = 2
 
-        nsteps = [2,6,18,54,162,486,486]
-        samples = np.zeros((len(nsteps),totsamp))
-        colors = cm.get_cmap('plasma')(np.linspace(1,0,len(nsteps)))
+        super().__init__(model, length , nwalkers=nwalkers, verbosity=verbosity)
+        self.steps = steps
+        self.start_ensemble  = self.chain[0]
 
-        for i,l in enumerate(nsteps):
-            samp.set_length(l)
-            points = samp.chain[0]
-            start = timer()
-            with tqdm(total = totsamp) as pbar:
-                while len(points) < totsamp:
-                    _ , new = samp.get_new(logL)
-                    points = np.append(points,new)
-                    samp.chain[0] = points[-nwalkers:]
-                    samp.elapsed_time_index = 0
-                    pbar.update(len(new))
-            time = timer() - start
-            # plt.scatter(points['position'][:,0],points['position'][:,1],alpha = 0.05)
-            # plt.xlim(mymodel.bounds[0][0], mymodel.bounds[1][0])
-            # plt.ylim(mymodel.bounds[0][1], mymodel.bounds[1][1])
-            micros_per_sample = time/len(points)*1e6
-            samples[i,:] = points['position'][:totsamp,0]
-            ax1.hist(samples[i], bins=64, histtype = 'step', color = colors[i], density = True, label =f'{l:5}  ({micros_per_sample:5.1f} $\mu$s/samp)')
+    def init(self):
+        for i in tqdm(range(self.steps), desc = 'initialising sampler', colour = 'green'):
+            self.AIEStep(continuous = True)
+        import matplotlib.pyplot as plt
+        return self
 
-        x_ = np.linspace(mymodel.center[0] - (-2*logL)**(1/2) + 0.01 ,mymodel.center[0] + (-2*logL)**(1/2) - 0.01  ,1000)
-        def analytical(x):
-            p = 1./x*np.sqrt(-2*logL -(x- mymodel.center[0])**2)
-            N = np.trapz(p, x = x)
-            return p/N
+    def get_new(self,Lmin, start_ensemble = None):
+        '''Returns ``nwalkers`` *different* point from prior given likelihood threshold.
 
-        ax1.plot(x_,analytical(x_),label = 'analytical', color = 'k' ,ls = ":")
-        fig.legend(loc = 'upper right', bbox_to_anchor = (0.95,0.9))
-        ax1.set_title ('Live points update distribution for various n_update')
+        As for AIEStep, needs that every point is in a valid region (the border is included).
 
-        #cumulants
-        samples     = np.sort(samples, axis = -1)
+        If the length of the sampler is not enough to ensure that all points are different
+        stretches it doubling ``self.steps`` each time. The stretch is *permanent*.
 
+        args
+        ----
+            Lmin : float
+                the threshold likelihood that a point must have to be accepted
 
+        Returns:
+            np.ndarray : new generated points
+        '''
+        if start_ensemble is not None:
+            self.start_ensemble = start_ensemble
+        else:
+            self.start_ensemble = self.chain[self.elapsed_time_index].copy()
 
-        x_ = np.linspace(0,1,totsamp)
-        for i in range(len(nsteps)):
-            plt.step(samples[i] , x_, color = colors[i])
+        import matplotlib.pyplot as plt
+        #evolves the sampler at the current length
+        for t in tqdm(range(self.steps), leave = False, desc = 'evolving'):
+            self.AIEStep(Lthreshold = Lmin, continuous = True)
 
-        x_ = np.linspace(mymodel.center[0] - (-2*logL)**(1/2) + 0.01 ,mymodel.center[0] + (-2*logL)**(1/2) - 0.01  ,totsamp)
-        analytical  = np.cumsum(analytical(x_) * np.diff(x_)[0])
-        plt.plot(x_, analytical,color = 'k' ,ls = ":")
+        # this part requires a time-expensive check each loop
+        # but since it is permanent it will allegedly be performed once or twice
+        while True:
+            #counts the duplicates
+            is_duplicate    = (self.chain['logL'][self.elapsed_time_index] == self.start_ensemble['logL'][:,None]).any(axis = 0) #time comsuming op
+            n_duplicate     = np.sum(is_duplicate.astype(int))
 
-        fig.tight_layout()
-        plt.show()
-        print(kstest(samples[-1],samples[-2]))
+            if n_duplicate == 0:
+                break
+            else:
+                print(f'WARNING: evolution steps extended to {2*self.steps} (runs with wrong evosteps give wrong results. \nThink about starting again.)')
+                self.steps = 2*self.steps
+                self.get_new(Lmin, start_ensemble = self.start_ensemble)
 
-
-
-    ####tests if sampling over threshold is correct
-    import matplotlib.pyplot as plt
-    test1()
+        return self.chain[self.elapsed_time_index]
