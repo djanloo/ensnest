@@ -36,9 +36,9 @@ class NestedSampler:
         self.delta_logX_closure  = - np.cumsum(1./self.N_closure)
 
         #initialises the sampler (AIES is the only option currently)
-        self.evo        = samplers.AIESampler(self.model, evosteps , nwalkers = nlive).sample_prior(progress=True).tail_to_head()
+        self.evo        = samplers.AIEevolver(self.model, evosteps , nwalkers = nlive).init()
         self.npoints    = npoints
-        self.points     = np.sort(self.evo.chain[0], order = 'logL')
+        self.points     = np.sort(self.evo.chain[self.evo.elapsed_time_index], order = 'logL')
 
         #integrate the first zone: (1-X0)*L0
         self.logZ = utils.logsubexp(0,-1./self.nlive) + self.points['logL'][0]
@@ -46,12 +46,12 @@ class NestedSampler:
         self.run_again  = True
         self.logZ_error = None
         self.relative_precision = 1e-4
-        self.logdZ_max_estimate = None
+        self.logdZ_max_estimate      = self.points['logL'][-1]+ self.logX[-1]
 
         self.run_time            = None
         self.error_estimate_time = None
 
-        self.progress_test = np.array([])
+        self.progress_offset = self.logZ - self.logdZ_max_estimate + np.log(self.relative_precision)
 
     def run(self):
         start = time()
@@ -61,24 +61,25 @@ class NestedSampler:
 
             #main loop
             while self.run_again:
-
                 new             = self.evo.get_new(self.points['logL'][ -self.nlive]) #counts nlive points from maxL, takes the L that contains all them
                 insert_index    = np.searchsorted(self.points['logL'],new['logL'])
                 self.points     = np.insert(self.points, insert_index, new)
                 self.points     = np.sort(self.points, order = 'logL') #because searchsorted fails sometimes
 
                 self.evo.reset(start = self.points[-self.nlive:])      #restarts the sampler giving last live points as initial ensemble
+
                 self.update()
                 pbar.n = self._compute_progress()
-                self.progress_test = np.append(self.progress_test, self._compute_progress())
                 pbar.refresh()
         plt.show()
         self.run_time = time() - start
         self.estimate_Zerror()
 
     def _compute_progress(self):
-        #print(np.exp(self.logZ - self.logdZ_max_estimate )*self.relative_precision)
-        return np.exp(self.logZ - self.logdZ_max_estimate )*self.relative_precision
+        progress = self.logZ - self.logdZ_max_estimate + np.log(self.relative_precision)
+        if progress < self.progress_offset:
+            self.progress_offset = progress
+        return min((progress - self.progress_offset)/(-self.progress_offset),1.)
 
     def update(self):
         '''updates the value of Z given the current state.
@@ -148,31 +149,23 @@ class NestedSampler:
 
     def estimate_Zerror(self):
         '''Estimates the error sampling t.
-
-        Very slow.
         '''
         Ntimes = 1000
         start = time()
-
-        #Nexpanded = np.tile(self.N, Ntimes)
-        #logt = np.array([self._log_worst_t_among(n) for _ , n in tqdm(np.ndenumerate(Nexpanded), total = Ntimes*len(self.N) ,desc = 'estimating error on logZ')])
-        #logt = logt.reshape(-1,len(self.N))
-        logt = np.zeros((Ntimes, len(self.N)))
-        for i in tqdm(range(Ntimes), desc = 'generating t-samples'):
-            logt[i] = self._log_worst_t_among_N()
-
-        self.error_estimate_time = time()-start
-
-        logX = np.cumsum(logt, axis = -1)
-        logX = np.insert(logX,logX.shape[1], -np.inf, axis = 1)
-        logX = np.insert(logX,0,0,axis = -1)
-
-        logZ_samp  = np.zeros(Ntimes)
+        logZ_samp = np.zeros(Ntimes)
+        logt      = np.zeros(len(self.N))
         for i in tqdm(range(Ntimes), 'computing Z samples'):
-            logZ_samp[i]  = np.log(-np.trapz(np.exp(self.logL), x = np.exp(logX[i])))
+            logt = self._log_worst_t_among_N()
+
+            logX = np.cumsum(logt)
+            logX = np.insert(logX,len(logX), -np.inf)
+            logX = np.insert(logX,0,0)
+
+            logZ_samp[i]  = np.log(-np.trapz(np.exp(self.logL), x = np.exp(logX)))
 
         self.logZ  = np.mean(logZ_samp)
         self.logZ_error = np.std (logZ_samp)
+        self.error_estimate_time = time() - start
 
 
     def check_prior_sampling(self, logL, evosteps, nsamples):

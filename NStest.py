@@ -46,13 +46,12 @@ def rosenbrocktest():
     fig3d = plt.figure(3)
     ax    = fig3d.add_subplot(projection = '3d')
     ax.scatter(ns.points['position'][:,0],ns.points['position'][:,1],np.exp(ns.points['logL']), c = np.exp(ns.points['logL']), cmap = 'plasma')
-
     plt.show()
 
 
 def gaussiantest():
-    nlive, npoints = 5000,10000000
-    ns = NestedSampler(model.Gaussian(50), nlive = nlive, npoints = npoints, evosteps = 8_000)
+    nlive = 1000
+    ns = NestedSampler(model.Gaussian(5), nlive = nlive, evosteps = 1000)
     ns.run()
     print(f'NS time {ns.run_time}')
     print(f'EE time {ns.error_estimate_time}')
