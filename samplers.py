@@ -55,6 +55,7 @@ class Sampler:
             self.chain['logP'] [0, walker]      = self.model.log_prior(self.chain[0, walker]['position'])
             self.chain['logL'][0, walker]       = self.model.log_likelihood(self.chain[0, walker]['position'])
 
+
 class AIESampler(Sampler):
     '''The Affine-Invariant Ensemble sampler (Goodman, Weare, 2010).
 
@@ -151,10 +152,10 @@ class AIESampler(Sampler):
             desc = 'sampling prior'
             if Lthreshold is not None:
                 desc += f' over logL > {Lthreshold:.2f}'
-            for t in tqdm(range(self.length - 1), desc = desc):
+            for t in tqdm(range(self.elapsed_time_index, self.length - 1), desc = desc):
                 self.AIEStep(Lthreshold = Lthreshold)
         else:
-            for t in range(self.length - 1):
+            for t in range(self.elapsed_time_index, self.length - 1):
                 self.AIEStep(Lthreshold = Lthreshold)
         return self
 
@@ -175,7 +176,7 @@ class AIESampler(Sampler):
             np.ndarray : new generated points
         '''
         #evolves the sampler at the current length
-        for t in range(1,self.length):
+        for t in tqdm(range(self.elapsed_time_index,self.length-1), leave = False, desc = 'evolving'):
             self.AIEStep(Lthreshold = Lmin)
 
         # this part requires a time-expensive check each loop
@@ -184,14 +185,14 @@ class AIESampler(Sampler):
             #counts the duplicates
             is_duplicate    = (self.chain['logL'][self.elapsed_time_index] == self.chain['logL'][0][:,None]).any(axis = 0) #time comsuming op
             n_duplicate     = np.sum(is_duplicate.astype(int))
-            
+
             if n_duplicate == 0:
                 break
             else:
 
-                print('WARNING: chain extended')
-                self.set_length(self.length + 1)
-                self.AIEStep(Lthreshold = Lmin)
+                print(f'WARNING: chain extended to {2*self.length}')
+                self.set_length(2*self.length)
+                self.get_new(Lmin)
 
         return self.chain[self.elapsed_time_index]
 
