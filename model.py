@@ -1,6 +1,11 @@
 import numpy as np
 from timeit import default_timer as timer
 
+N_TIME_EVAL = 100
+
+MULTIWALKER_TEST_SHAPE  = (4,3)
+TEST_SHAPE              = (3,)
+
 class Model:
     '''Class to describe models
 
@@ -74,7 +79,7 @@ class Model:
         '''
 
         #checks for (time, walker, position)-like evaluation
-        testshape = (4,3)
+        testshape = MULTIWALKER_TEST_SHAPE
         dummy1 = np.random.random(testshape + (self.space_dim,))
 
         log_prior_result = self.log_prior(dummy1)
@@ -87,7 +92,7 @@ class Model:
 
         #checks for (time, position)-like evaluation
         #and iteration order differences
-        testshape = (3,)
+        testshape = TEST_SHAPE
         dummy2 = np.random.random(testshape + (self.space_dim,))
 
         result1 = np.array([self.log_prior(_) for _ in dummy2])
@@ -103,20 +108,20 @@ class Model:
             raise ValueError('Bad-behaving log_likelihood: different results for different iteration order')
 
         #estimates the time required for the evaluation of log_likelihood and log_prior
-        testshape = (4,3)
+        testshape = MULTIWALKER_TEST_SHAPE
         dummy_input = np.random.random(testshape + (self.space_dim,))
 
         start = timer()
-        for i in range(100):
+        for i in range(N_TIME_EVAL):
             dummy_result = self.log_prior(dummy_input)
         end = timer()
-        self.log_prior_execution_time_estimate = (end - start)/100.
+        self.log_prior_execution_time_estimate = (end - start)/N_TIME_EVAL
 
         start = timer()
-        for i in range(100):
+        for i in range(N_TIME_EVAL):
             dummy_result = self.log_prior(dummy_input)
         end = timer()
-        self.log_likelihood_execution_time_estimate = (end - start)/100.
+        self.log_likelihood_execution_time_estimate = (end - start)/N_TIME_EVAL
 
         print(f'Correctly initialised a {self.space_dim}-D model with \n\tT_prior      ~ {self.log_prior_execution_time_estimate*1e6:.2f} us\n\tT_likelihood ~ {self.log_likelihood_execution_time_estimate*1e6:.2f} us')
 
@@ -206,10 +211,20 @@ class Model:
             return log_func(self,*args) + self.log_chi(*args)
         return _autobound_wrapper
 
+    def __hash__(self):
+        """Generate a unique code for model"""
+        #since function by themselves are variably hashable
+        #takes 10 points over the diagonal of the space
+        points = np.linspace(0,1,10)[:,None]*(self.bounds[1] - self.bounds[0]) + self.bounds[0]
+        results_on_diag = tuple([*self.log_prior(points),*self.log_likelihood(points)])
+        inf = tuple(self.bounds[0])
+        sup = tuple(self.bounds[1])
+        return hash(results_on_diag + inf + sup)
+
 
 #some simple models useful for testing
 
-class ToyGaussian(Model):
+class Gaussian(Model):
     def __init__(self,dim = 1):
         self.bounds = (-np.ones(dim)*10 ,np.ones(dim)*10 )
         self.names  = ['a']
@@ -226,7 +241,7 @@ class ToyGaussian(Model):
 class UniformJeffreys(Model):
 
     def __init__(self):
-        self.bounds = ([0.1,-10],[10,10])
+        self.bounds = ([0.1,-5],[10,5])
         self.names  = ['a','b']
         self.center = np.array([3,0])
         super().__init__()
@@ -242,7 +257,7 @@ class UniformJeffreys(Model):
 class RosenBrock(Model):
 
     def __init__(self):
-        self.bounds = ([-10,-1],[10,10])
+        self.bounds = ([-5,-1],[5,10])
         self.names  = ['1','2']
         self.center = np.array([3,0])
         super().__init__()
