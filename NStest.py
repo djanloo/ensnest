@@ -50,8 +50,8 @@ def rosenbrocktest():
 
 
 def gaussiantest():
-    nlive = 1000
-    ns = NestedSampler(model.Gaussian(5), nlive = nlive, evosteps = 1000)
+    nlive = 100
+    ns = NestedSampler(model.Gaussian(2), nlive = nlive, evosteps = 101)
     ns.run()
     print(f'NS time {ns.run_time}')
     print(f'EE time {ns.error_estimate_time}')
