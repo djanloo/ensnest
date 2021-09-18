@@ -3,6 +3,8 @@ from timeit import default_timer as timer
 
 N_TIME_EVAL = 100
 
+MULTIWALKER_TEST_SHAPE  = (4,3)
+TEST_SHAPE              = (3,)
 
 class Model:
     '''Class to describe models
@@ -77,7 +79,7 @@ class Model:
         '''
 
         #checks for (time, walker, position)-like evaluation
-        testshape = (4,3)
+        testshape = MULTIWALKER_TEST_SHAPE
         dummy1 = np.random.random(testshape + (self.space_dim,))
 
         log_prior_result = self.log_prior(dummy1)
@@ -90,7 +92,7 @@ class Model:
 
         #checks for (time, position)-like evaluation
         #and iteration order differences
-        testshape = (3,)
+        testshape = TEST_SHAPE
         dummy2 = np.random.random(testshape + (self.space_dim,))
 
         result1 = np.array([self.log_prior(_) for _ in dummy2])
@@ -106,7 +108,7 @@ class Model:
             raise ValueError('Bad-behaving log_likelihood: different results for different iteration order')
 
         #estimates the time required for the evaluation of log_likelihood and log_prior
-        testshape = (4,3)
+        testshape = MULTIWALKER_TEST_SHAPE
         dummy_input = np.random.random(testshape + (self.space_dim,))
 
         start = timer()
@@ -208,6 +210,16 @@ class Model:
         def _autobound_wrapper(self,*args):
             return log_func(self,*args) + self.log_chi(*args)
         return _autobound_wrapper
+
+    def __hash__(self):
+        """Generate a unique code for model"""
+        #since function by themselves are variably hashable
+        #takes 10 points over the diagonal of the space
+        points = np.linspace(0,1,10)[:,None]*(self.bounds[1] - self.bounds[0]) + self.bounds[0]
+        results_on_diag = tuple([*self.log_prior(points),*self.log_likelihood(points)])
+        inf = tuple(self.bounds[0])
+        sup = tuple(self.bounds[1])
+        return hash(results_on_diag + inf + sup)
 
 
 #some simple models useful for testing
