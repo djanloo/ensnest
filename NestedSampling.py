@@ -12,6 +12,11 @@ from scipy.stats import kstest
 
 import os
 
+BAR_FMT= "{desc:<25.25}:{percentage:3.0f}%|{bar}|"
+u = '{r_bar}'
+
+BAR_FMT_ZSAMP= "{desc:<25.25}:{percentage:3.0f}%|{bar}|{r_bar}"
+
 
 
 np.seterr(divide = 'ignore')
@@ -64,7 +69,7 @@ class NestedSampler:
         if self.loaded:
             return
         start = time()
-        with tqdm(total = 1., desc='nested sampling', unit_scale=True , colour = 'blue') as pbar:
+        with tqdm(total = 1., desc='nested sampling', unit_scale=True , colour = 'blue', bar_format = BAR_FMT) as pbar:
 
             #main loop
             while self.run_again:
@@ -163,7 +168,7 @@ class NestedSampler:
         start = time()
         logZ_samp = np.zeros(Ntimes)
         logt      = np.zeros(len(self.N))
-        for i in tqdm(range(Ntimes), 'computing Z samples'):
+        for i in tqdm(range(Ntimes), 'computing Z samples', bar_format = BAR_FMT_ZSAMP):
             logt = self._log_worst_t_among_N()
 
             logX = np.cumsum(logt)

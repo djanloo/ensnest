@@ -18,6 +18,9 @@ from tqdm import tqdm, trange
 
 from timeit import default_timer as timer
 
+BAR_FMT="{desc:<25.25}:{percentage:3.0f}%|{bar}|"
+BAR_FMT_EVOL= "{desc:<25.25}:{percentage:3.0f}%|{bar:10}|"
+
 class Sampler:
     """Produces samples from model.
 
@@ -240,7 +243,7 @@ class AIEevolver(AIESampler):
         self.start_ensemble  = self.chain[0]
 
     def init(self):
-        for i in tqdm(range(self.steps), desc = 'initialising sampler', colour = 'green'):
+        for i in tqdm(range(self.steps), desc = 'initialising sampler', colour = 'green', bar_format = BAR_FMT):
             self.AIEStep(continuous = True)
         import matplotlib.pyplot as plt
         return self
@@ -268,7 +271,7 @@ class AIEevolver(AIESampler):
 
         import matplotlib.pyplot as plt
         #evolves the sampler at the current length
-        for t in tqdm(range(self.steps), leave = False, desc = 'evolving'):
+        for t in tqdm(range(self.steps), leave = False, desc = 'evolving',bar_format = BAR_FMT_EVOL):
             self.AIEStep(Lthreshold = Lmin, continuous = True)
 
         # this part requires a time-expensive check each loop
