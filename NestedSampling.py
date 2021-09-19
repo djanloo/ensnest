@@ -100,6 +100,7 @@ class NestedSampler:
         plt.show()
         self.run_time = time() - start
         self.estimate_Zerror()
+        self.varenv_points()
         self.save()
 
     def _compute_progress(self):
@@ -193,9 +194,11 @@ class NestedSampler:
         self.logZ       = np.mean(self.logZ_samples)
         self.logZ_error = np.std(self.logZ_samples)
         self.Z          = np.exp(self.logZ)
-        self.Z_error    = self.Z*self.logZ_error 
+        self.Z_error    = self.Z*self.logZ_error
         self.error_estimate_time = time() - start
 
+    def varenv_points(self):
+        self.points['position'] = self.points.view(self.model.position_t)
 
     def check_prior_sampling(self, logL, evosteps, nsamples):
         """Samples the prior over a given likelihood threshold with different steps of evolution.

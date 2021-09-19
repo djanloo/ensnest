@@ -24,7 +24,7 @@ class lighthouse_model(model.Model):
 
 data = np.array([-10,-5,-2,-2,-5,-1,-2,6,5,3])
 mod = lighthouse_model(data)
-ns  = NestedSampler(mod, nlive = 1000, evosteps = 1000, load_old=False, filename = 'lighthouse.nkn')
+ns  = NestedSampler(mod, nlive = 10, evosteps = 100, load_old=False, filename = 'lighthouse.nkn')
 ns.run()
 print(ns.Z, ns.Z_error)
 fig, ax = plt.subplots()
@@ -32,5 +32,4 @@ ax.plot(ns.logX, ns.logL)
 
 fig, scat = plt.subplots()
 scat.scatter(ns.points['position'][:,0],ns.points['position'][:,1], c = np.exp(ns.points['logL']), cmap='plasma')
-print(np.max(ns.points['logL']))
 plt.show()
