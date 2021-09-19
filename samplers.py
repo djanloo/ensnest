@@ -4,8 +4,6 @@ Module containing the samplers used in main calculations.
 Since almost every sampler is defined by a markov chain, basic attributes are
 the model and the length of the chain.
 
-Each sampler shoud be capable of tackling with discontinuous functions.
-
 Since is intended to be used in nested sampling, each sampler should support likelihood constrained prior sampling (LCPS).
 
 """

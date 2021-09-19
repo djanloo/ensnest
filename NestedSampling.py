@@ -23,31 +23,37 @@ class NestedSampler:
 
     def __init__(self,model, nlive = 1000, npoints = np.inf, evosteps = 100, relative_precision = 1e-4, load_old = None, filename = None):
 
+        #run fundamentals
         self.model      = model
         self.nlive      = nlive
         self.evosteps   = evosteps
+        self.relative_precision = relative_precision
 
+        #main variables
         self.logZ       = -np.inf
+        self.Z          = None
         self.logX       = np.array([0.],        dtype=np.float64)
         self.logL       = np.array([-np.inf],   dtype=np.float64)
         self.N          = np.array([],          dtype=np.int)
         self.logdZ      = None
         self.npoints    = npoints
 
+        #errors and time log
         self.run_again  = True
         self.logZ_error = None
+        self.Z_error    = None
         self.logZ_samples  = None
-        self.relative_precision = relative_precision
         self.run_time            = None
         self.error_estimate_time = None
 
+        #utils
         self.elapsed_clusters    =   0
         self.N_continue          =   np.flip( np.append( np.arange(self.nlive, 2*self.nlive , dtype=np.int) , [self.nlive] ))
         self.delta_logX_continue = - np.cumsum(1./self.N_continue)
         self.N_closure           =   np.flip( np.arange(1, self.nlive+1, dtype=np.int) )
         self.delta_logX_closure  = - np.cumsum(1./self.N_closure)
 
-        #checks for an already saved run
+        #save/load
         self.loaded   = False
         self.load_old = load_old
         if filename is None:
@@ -184,8 +190,10 @@ class NestedSampler:
 
             self.logZ_samples[i]  = np.log(-np.trapz(np.exp(self.logL), x = np.exp(logX)))
 
-        self.logZ  = np.mean(self.logZ_samples)
+        self.logZ       = np.mean(self.logZ_samples)
         self.logZ_error = np.std(self.logZ_samples)
+        self.Z          = np.exp(self.logZ)
+        self.Z_error    = self.Z*self.logZ_error 
         self.error_estimate_time = time() - start
 
 
