@@ -21,7 +21,7 @@ np.seterr(divide = 'ignore')
 
 class NestedSampler:
 
-    def __init__(self,model, nlive = 1000, npoints = np.inf, evosteps = 100, relative_precision = 1e-4, load_old = None, filename = None):
+    def __init__(self,model, nlive = 1000, npoints = np.inf, evosteps = 100, relative_precision = 1e-4, load_old = None, filename = None, evo_progress = True):
 
         #run fundamentals
         self.model      = model
@@ -63,6 +63,8 @@ class NestedSampler:
         self.path = os.path.join('__inknest__',self.filename)
         self.check_saved()
 
+        self.evo_progress = evo_progress
+
         if not self.loaded:
             #initialises the sampler (AIES is the only option currently)
             self.evo        = samplers.AIEevolver(self.model, evosteps , nwalkers = nlive).init()
@@ -86,7 +88,7 @@ class NestedSampler:
 
             #main loop
             while self.run_again:
-                new             = self.evo.get_new(self.points['logL'][ -self.nlive]) #counts nlive points from maxL, takes the logL that contains all them
+                new             = self.evo.get_new(self.points['logL'][ -self.nlive], progress = self.evo_progress) #counts nlive points from maxL, takes the logL that contains all them
                 insert_index    = np.searchsorted(self.points['logL'],new['logL'])
                 self.points     = np.insert(self.points, insert_index, new)
                 self.points     = np.sort(self.points, order = 'logL') #because searchsorted fails sometimes
@@ -225,22 +227,23 @@ class NestedSampler:
         """
 
         evosteps = np.array(evosteps)
-        samp     = samplers.AIESampler(self.model, 100, nwalkers = self.nlive)
+        samp     = samplers.AIEevolver(self.model, 100, nwalkers = self.nlive)
 
         samp.bring_over_threshold(logL)
+        starting_points = samp.chain[samp.elapsed_time_index]
 
         samples      = np.zeros((len(evosteps),nsamples, self.model.space_dim))
         microtimes   = np.zeros(len(evosteps))
 
-        for i in range(len(evosteps)):
-            samp.set_length(evosteps[i])
-            points  = samp.chain[0]
+        for i in tqdm(range(len(evosteps)), desc='checking LCPS', bar_format = BAR_FMT):
+            samp._force_steps_number(evosteps[i])
+            points  = starting_points
             start   = time()
-            with tqdm(total = nsamples, desc = f'[test] sampling prior (evosteps = {evosteps[i]:4})', colour = 'green') as pbar:
+            with tqdm(total = nsamples, desc = f'[test] sampling prior (evosteps = {evosteps[i]:4})', colour = 'green', leave = False) as pbar:
                 while len(points) < nsamples:
-                    _ , new = samp.get_new(logL)
-                    points = np.append(points,new)
-                    samp.elapsed_time_index = 0
+                    new     = samp.get_new(logL, progress = False, allow_resize = False)
+                    points  = np.append(points,new)
+                    samp.reset(start = new) #check what happens if you say start = last sorted points
                     pbar.update(len(new))
 
             microtimes[i]   = (time() - start)/len(points)*1e6

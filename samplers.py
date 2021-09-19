@@ -221,7 +221,7 @@ class AIEevolver(AIESampler):
             self.AIEStep(continuous = True)
         return self
 
-    def get_new(self,Lmin, start_ensemble = None):
+    def get_new(self,Lmin, start_ensemble = None, progress = False, allow_resize = True):
         '''Returns ``nwalkers`` *different* point from prior given likelihood threshold.
 
         As for AIEStep, needs that every point is in a valid region (the border is included).
@@ -242,9 +242,8 @@ class AIEevolver(AIESampler):
         else:
             self.start_ensemble = self.chain[self.elapsed_time_index].copy()
 
-        import matplotlib.pyplot as plt
         #evolves the sampler at the current length
-        for t in tqdm(range(self.steps), leave = False, desc = 'evolving',bar_format = BAR_FMT_EVOL):
+        for t in tqdm(range(self.steps), leave = False, desc = 'evolving',bar_format = BAR_FMT_EVOL, disable = not progress):
             self.AIEStep(Lthreshold = Lmin, continuous = True)
 
         # this part requires a time-expensive check each loop
@@ -257,7 +256,10 @@ class AIEevolver(AIESampler):
             if n_duplicate == 0:
                 break
             else:
-                print(f'\nWARNING: evolution steps extended to {2*self.steps} (runs with wrong evosteps give wrong results. \nThink about starting again.)')
+                if not allow_resize:
+                    print('CRITICAL: ensemble did not evolve due to too low number of steps (resize unallowed).')
+                    exit()
+                print(f'\nWARNING: evolution steps extended to {2*self.steps}')
                 self.steps = 2*self.steps
                 self.get_new(Lmin, start_ensemble = self.start_ensemble)
 
@@ -285,3 +287,6 @@ class AIEevolver(AIESampler):
                 self.reset(start = sorted[-self.nwalkers:])
                 pbar.n = np.exp(min(logLmin, logLthreshold) - logLthreshold  )
                 pbar.refresh()
+
+    def _force_steps_number(self,steps):
+        self.steps = steps
