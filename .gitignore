@@ -139,6 +139,8 @@ documentation/build/*
 !*/inknest.pdf
 *omit*
 omit/
+__inknest__/
+_inknest_/
 
 
 #c stuff by cython

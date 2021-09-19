@@ -11,10 +11,9 @@ from timeit import default_timer as time
 from scipy.stats import kstest
 
 import os
+import pickle
 
 BAR_FMT= "{desc:<25.25}:{percentage:3.0f}%|{bar}|"
-u = '{r_bar}'
-
 BAR_FMT_ZSAMP= "{desc:<25.25}:{percentage:3.0f}%|{bar}|{r_bar}"
 
 np.seterr(divide = 'ignore')
@@ -22,7 +21,7 @@ np.seterr(divide = 'ignore')
 
 class NestedSampler:
 
-    def __init__(self,model, nlive = 1000, npoints = np.inf, evosteps = 100, load_old = None):
+    def __init__(self,model, nlive = 1000, npoints = np.inf, evosteps = 100, relative_precision = 1e-4, load_old = None, filename = None):
 
         self.model      = model
         self.nlive      = nlive
@@ -38,7 +37,7 @@ class NestedSampler:
         self.run_again  = True
         self.logZ_error = None
         self.logZ_samples  = None
-        self.relative_precision = 1e-4
+        self.relative_precision = relative_precision
         self.run_time            = None
         self.error_estimate_time = None
 
@@ -51,6 +50,11 @@ class NestedSampler:
         #checks for an already saved run
         self.loaded   = False
         self.load_old = load_old
+        if filename is None:
+            self.filename = 'inknest_NS' + str(hash(self)) + '.nkn'
+        else:
+            self.filename = filename
+        self.path = os.path.join('__inknest__',self.filename)
         self.check_saved()
 
         if not self.loaded:
@@ -67,13 +71,16 @@ class NestedSampler:
 
     def run(self):
         if self.loaded:
+            print('Run loaded from file')
             return
+        else:
+            print(f'Starting run with code: {hash(self)}')
         start = time()
         with tqdm(total = 1., desc='nested sampling', unit_scale=True , colour = 'blue', bar_format = BAR_FMT) as pbar:
 
             #main loop
             while self.run_again:
-                new             = self.evo.get_new(self.points['logL'][ -self.nlive]) #counts nlive points from maxL, takes the L that contains all them
+                new             = self.evo.get_new(self.points['logL'][ -self.nlive]) #counts nlive points from maxL, takes the logL that contains all them
                 insert_index    = np.searchsorted(self.points['logL'],new['logL'])
                 self.points     = np.insert(self.points, insert_index, new)
                 self.points     = np.sort(self.points, order = 'logL') #because searchsorted fails sometimes
@@ -236,22 +243,23 @@ class NestedSampler:
         return samples, microtimes, ks_stats
 
     def save(self):
-        if not os.path.exists('_inknest_'):
-            os.makedirs('_inknest_')
-        stats = np.array( [self.points, self.logZ, self.logZ_error,self.logX, self.logL, self.N, self.logZ_samples, self.elapsed_clusters,self.relative_precision, self.run_time, self.error_estimate_time], dtype=object)
-        np.save(os.path.join('_inknest_','INKNEST_NS_STATS' + str(hash(self))),stats)
+        try:
+            os.mkdir('__inknest__')
+        except FileExistsError:
+            pass
+        out_file = open(self.path, 'wb')
+        pickle.dump(self.__dict__, out_file, -1)
 
-
-    def load(self,filename = None):
+    def load(self):
         '''Loads an already performed run which has the same hashcode'''
-        if filename is None:
-            filename = os.path.join('_inknest_','INKNEST_NS_STATS' + str(hash(self)) + '.npy'  )
-        self.points, self.logZ, self.logZ_error,self.logX, self.logL, self.N, self.logZ_samples,self.elapsed_clusters,self.relative_precision , self.run_time, self.error_estimate_time = np.load(filename, allow_pickle = True)
+        with open(self.path, 'rb') as in_file:
+            tmp_dict = pickle.load(in_file)
+            self.__dict__.update(tmp_dict)
 
     def check_saved(self):
         '''Checks wether an already performed run exists and asks wether to load it or not.'''
         try:
-            with open(os.path.join('_inknest_','INKNEST_NS_STATS' + str(hash(self)) + '.npy'  )):
+            with open(self.path):
                 if self.load_old is None:
                     reply = str(input('An execution of this run has been found. Do you want to load it? (y/n): ')).lower().strip()
                     if reply[0] == 'y':

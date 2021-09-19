@@ -28,10 +28,9 @@ def check_constrained_distrib():
     plt.show()
 
 
-def rosenbrocktest():
+def rosenbrocktest(nlive = 100, evosteps = 500):
     my_model = model.RosenBrock()
-    nlive = 100
-    ns = NestedSampler(my_model, nlive = nlive,  evosteps = 500, load_old = False)
+    ns = NestedSampler(my_model, nlive = nlive,  evosteps = evosteps, load_old = False)
 
     ns.run()
 
@@ -50,9 +49,8 @@ def rosenbrocktest():
 
 def gaussiantest(dimension = 2, nlive = 100, evosteps = 1000):
     ns = NestedSampler(model.Gaussian(dimension), nlive = nlive, evosteps = evosteps,load_old = True)
-    print(f'hashcode is {hash(ns)}')
     ns.run()
     print(f'NS time {ns.run_time}')
     print(f'EE time {ns.error_estimate_time}')
     print(f'integral = {np.exp(ns.logZ)*ns.model.volume}  +- {np.exp(ns.logZ)*ns.logZ_error*ns.model.volume}')
-    plt.show()
+    return ns

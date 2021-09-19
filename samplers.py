@@ -195,30 +195,6 @@ class AIESampler(Sampler):
         '''
         return self.chain[int(burn_in*self.length):].flatten()
 
-    def bring_over_threshold(self, logLthreshold):
-        '''Brings the sampler over threshold.
-
-        It is necessary to initialise the sampler before sampling over threshold.
-
-        args
-        ----
-            Lthreshold : float
-                the logarithm of the likelihood.
-        '''
-        logLmin = np.min(self.chain['logL'][0])
-        print('ERROR: this function is no longer available due to branching to AIEevolver')
-        with tqdm(total = 1, desc = 'bringing over threshold') as pbar:
-            while logLmin < logLthreshold:
-                sorted = np.sort(self.chain[0], order='logL')
-                logLmin   = sorted['logL'][0]
-                new    = self.get_new(logLmin)
-                sorted = np.append(sorted, new)
-                sorted = np.sort(sorted, order='logL')
-                self.chain[0] = sorted[-self.nwalkers:]
-                self.elapsed_time_index = 0
-                pbar.n = np.exp(min(logLmin, logLthreshold) - logLthreshold  )
-                pbar.refresh()
-
     def set_length(self, length):
         old_length  = self.length
         self.length = length
@@ -245,7 +221,6 @@ class AIEevolver(AIESampler):
     def init(self):
         for i in tqdm(range(self.steps), desc = 'initialising sampler', colour = 'green', bar_format = BAR_FMT):
             self.AIEStep(continuous = True)
-        import matplotlib.pyplot as plt
         return self
 
     def get_new(self,Lmin, start_ensemble = None):
@@ -289,3 +264,26 @@ class AIEevolver(AIESampler):
                 self.get_new(Lmin, start_ensemble = self.start_ensemble)
 
         return self.chain[self.elapsed_time_index]
+
+
+    def bring_over_threshold(self, logLthreshold):
+        '''Brings the sampler over threshold.
+
+        It is necessary to initialise the sampler before sampling over threshold.
+
+        args
+        ----
+            Lthreshold : float
+                the logarithm of the likelihood.
+        '''
+        logLmin = np.min(self.chain['logL'][self.elapsed_time_index])
+        with tqdm(total = 1, desc = 'bringing over threshold') as pbar:
+            while logLmin < logLthreshold:
+                sorted  = np.sort(self.chain[self.elapsed_time_index], order='logL')
+                logLmin = sorted['logL'][0]
+                new     = self.get_new(logLmin)
+                sorted  = np.append(sorted, new)
+                sorted  = np.sort(sorted, order='logL')
+                self.reset(start = sorted[-self.nwalkers:])
+                pbar.n = np.exp(min(logLmin, logLthreshold) - logLthreshold  )
+                pbar.refresh()
