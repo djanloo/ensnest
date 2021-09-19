@@ -5,11 +5,10 @@ import matplotlib.pyplot as plt
 
 class lighthouse_model(model.Model):
 
-      def __init__(self,data):
+      def set_parameters(self,data):
           self.bounds = ([-10,0], [10,10])
           self.names  = ['a', 'b']
           self.data   = data
-          super().__init__()
 
       @model.Model.auto_bound
       def log_prior(self,vars):
@@ -17,19 +16,19 @@ class lighthouse_model(model.Model):
 
       @model.Model.varenv
       def log_likelihood(self,vars):
-          u = np.ones(vars.shape)
-          for i in range(len(data)):
-              u += np.log(vars['b']) - np.log(vars['b']**2 + (data[i] - vars['a'])**2)
+          u = np.zeros(vars.shape)
+          for i in range(len(self.data)):
+              u += np.log(vars['b']) - np.log(vars['b']**2 + (self.data[i] - vars['a'])**2)
           return u
 
-data = np.array([-10,-5,-2,-2,-5,-1,-2,6,5,3])
-mod = lighthouse_model(data)
-ns  = NestedSampler(mod, nlive = 10, evosteps = 100, load_old=False, filename = 'lighthouse.nkn')
+x_observations = [-9.8,-8.5,9.1,9.9,7.4,-6.]
+model_        = lighthouse_model(x_observations)
+ns            = NestedSampler(model_, nlive = 1000, evosteps = 1000, load_old=False, filename = 'lighthouse.nkn')
+
 ns.run()
 print(ns.Z, ns.Z_error)
-fig, ax = plt.subplots()
-ax.plot(ns.logX, ns.logL)
 
 fig, scat = plt.subplots()
 scat.scatter(ns.points['position']['a'],ns.points['position']['b'], c = np.exp(ns.points['logL']), cmap='plasma')
+
 plt.show()

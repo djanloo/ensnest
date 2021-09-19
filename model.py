@@ -30,9 +30,11 @@ class Model:
         must return a float ( not a (1,)-shaped array )
 
     '''
-    def __init__(self):
+    def __init__(self,*args):
         '''Initialise and checks the model
         '''
+        #call the child function to set parameters
+        self.set_parameters(*args)
         self.bounds = (np.array(self.bounds[0]).astype(float), np.array(self.bounds[1]).astype(float))
         if not hasattr(self, 'names'):
             self.names = []
@@ -68,11 +70,14 @@ class Model:
 
         self._check()
 
+    def set_parameters(self):
+        raise NotImplementedError('set_parameters must be user-defined')
+
     def log_likelihood(self,x):
-        raise NotImplementedError('log_likelihood not defined')
+        raise NotImplementedError('log_likelihood must be user-defined')
 
     def log_prior(self, x):
-        raise NotImplementedError('log_prior not defined')
+        raise NotImplementedError('log_prior not must be user-defined')
 
     def _check(self):
         '''Checks if log_prior and log_likelihood are well behaved in return shape
