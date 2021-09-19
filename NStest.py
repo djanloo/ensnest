@@ -30,12 +30,12 @@ def check_constrained_distrib():
 
 def rosenbrocktest():
     my_model = model.RosenBrock()
-    nlive, npoints = 1_000, 50_000
-    ns = NestedSampler(my_model, nlive = nlive,  npoints = npoints, evosteps = 1000)
+    nlive = 100
+    ns = NestedSampler(my_model, nlive = nlive,  evosteps = 500, load_old = False)
 
     ns.run()
 
-    print(f'logZ = {ns.logZ}')
+    print(f'logZ = {ns.logZ} +- {ns.logZ_error}')
     fig,ax = plt.subplots(1)
     plt.rc('font', size = 11)
     plt.rc('font', family = 'serif')
@@ -48,10 +48,9 @@ def rosenbrocktest():
     ax.scatter(ns.points['position'][:,0],ns.points['position'][:,1],np.exp(ns.points['logL']), c = np.exp(ns.points['logL']), cmap = 'plasma')
     plt.show()
 
-
-def gaussiantest():
-    nlive = 1000
-    ns = NestedSampler(model.Gaussian(3), nlive = nlive, evosteps = 1000)
+def gaussiantest(dimension = 2, nlive = 100, evosteps = 1000):
+    ns = NestedSampler(model.Gaussian(dimension), nlive = nlive, evosteps = evosteps,load_old = True)
+    print(f'hashcode is {hash(ns)}')
     ns.run()
     print(f'NS time {ns.run_time}')
     print(f'EE time {ns.error_estimate_time}')

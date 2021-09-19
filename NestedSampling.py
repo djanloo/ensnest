@@ -17,14 +17,12 @@ u = '{r_bar}'
 
 BAR_FMT_ZSAMP= "{desc:<25.25}:{percentage:3.0f}%|{bar}|{r_bar}"
 
-
-
 np.seterr(divide = 'ignore')
 
 
 class NestedSampler:
 
-    def __init__(self,model, nlive = 1000, npoints = np.inf, evosteps = 100):
+    def __init__(self,model, nlive = 1000, npoints = np.inf, evosteps = 100, load_old = None):
 
         self.model      = model
         self.nlive      = nlive
@@ -39,6 +37,7 @@ class NestedSampler:
 
         self.run_again  = True
         self.logZ_error = None
+        self.logZ_samples  = None
         self.relative_precision = 1e-4
         self.run_time            = None
         self.error_estimate_time = None
@@ -50,7 +49,8 @@ class NestedSampler:
         self.delta_logX_closure  = - np.cumsum(1./self.N_closure)
 
         #checks for an already saved run
-        self.loaded = False
+        self.loaded   = False
+        self.load_old = load_old
         self.check_saved()
 
         if not self.loaded:
@@ -166,7 +166,7 @@ class NestedSampler:
         '''
         Ntimes = 1000
         start = time()
-        logZ_samp = np.zeros(Ntimes)
+        self.logZ_samples = np.zeros(Ntimes)
         logt      = np.zeros(len(self.N))
         for i in tqdm(range(Ntimes), 'computing Z samples', bar_format = BAR_FMT_ZSAMP):
             logt = self._log_worst_t_among_N()
@@ -175,10 +175,10 @@ class NestedSampler:
             logX = np.insert(logX,len(logX), -np.inf)
             logX = np.insert(logX,0,0)
 
-            logZ_samp[i]  = np.log(-np.trapz(np.exp(self.logL), x = np.exp(logX)))
+            self.logZ_samples[i]  = np.log(-np.trapz(np.exp(self.logL), x = np.exp(logX)))
 
-        self.logZ  = np.mean(logZ_samp)
-        self.logZ_error = np.std (logZ_samp)
+        self.logZ  = np.mean(self.logZ_samples)
+        self.logZ_error = np.std(self.logZ_samples)
         self.error_estimate_time = time() - start
 
 
@@ -238,24 +238,30 @@ class NestedSampler:
     def save(self):
         if not os.path.exists('_inknest_'):
             os.makedirs('_inknest_')
-        stats = np.array( [self.points, self.logZ, self.logZ_error,self.logX, self.logL, self.N, self.elapsed_clusters,self.relative_precision, self.run_time, self.error_estimate_time], dtype=object)
+        stats = np.array( [self.points, self.logZ, self.logZ_error,self.logX, self.logL, self.N, self.logZ_samples, self.elapsed_clusters,self.relative_precision, self.run_time, self.error_estimate_time], dtype=object)
         np.save(os.path.join('_inknest_','INKNEST_NS_STATS' + str(hash(self))),stats)
 
 
-    def load(self):
+    def load(self,filename = None):
         '''Loads an already performed run which has the same hashcode'''
-        self.points, self.logZ, self.logZ_error,self.logX, self.logL, self.N, self.elapsed_clusters,self.relative_precision , self.run_time, self.error_estimate_time = np.load(os.path.join('_inknest_','INKNEST_NS_STATS' + str(hash(self)) + '.npy'  ), allow_pickle = True)
+        if filename is None:
+            filename = os.path.join('_inknest_','INKNEST_NS_STATS' + str(hash(self)) + '.npy'  )
+        self.points, self.logZ, self.logZ_error,self.logX, self.logL, self.N, self.logZ_samples,self.elapsed_clusters,self.relative_precision , self.run_time, self.error_estimate_time = np.load(filename, allow_pickle = True)
 
     def check_saved(self):
         '''Checks wether an already performed run exists and asks wether to load it or not.'''
         try:
             with open(os.path.join('_inknest_','INKNEST_NS_STATS' + str(hash(self)) + '.npy'  )):
-                reply = str(input('An execution of this run has been found. Do you want to load it? (y/n): ')).lower().strip()
-                if reply[0] == 'y':
+                if self.load_old is None:
+                    reply = str(input('An execution of this run has been found. Do you want to load it? (y/n): ')).lower().strip()
+                    if reply[0] == 'y':
+                        self.load()
+                        self.loaded = True
+                elif self.load_old:
                     self.load()
                     self.loaded = True
         except IOError:
-            print('file not found')
+            pass
 
     def __hash__(self):
         '''Gives the (almost) unique code for the run'''

@@ -212,7 +212,7 @@ class Model:
         return _autobound_wrapper
 
     def __hash__(self):
-        """Generate a unique code for model"""
+        """Generates a (almost) unique code for model"""
         #since function by themselves are variably hashable
         #takes 10 points over the diagonal of the space
         points = np.linspace(0,1,10)[:,None]*(self.bounds[1] - self.bounds[0]) + self.bounds[0]
@@ -249,7 +249,7 @@ class UniformJeffreys(Model):
     @Model.auto_bound
     @Model.varenv
     def log_prior(self,x):
-        return np.log(1./x['a'])
+        return np.log(1./x['b'])
 
     def log_likelihood(self,x):
         return -0.5*np.sum((x-self.center)**2,axis = -1)

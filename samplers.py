@@ -284,7 +284,7 @@ class AIEevolver(AIESampler):
             if n_duplicate == 0:
                 break
             else:
-                print(f'WARNING: evolution steps extended to {2*self.steps} (runs with wrong evosteps give wrong results. \nThink about starting again.)')
+                print(f'\nWARNING: evolution steps extended to {2*self.steps} (runs with wrong evosteps give wrong results. \nThink about starting again.)')
                 self.steps = 2*self.steps
                 self.get_new(Lmin, start_ensemble = self.start_ensemble)
 
