@@ -31,5 +31,5 @@ fig, ax = plt.subplots()
 ax.plot(ns.logX, ns.logL)
 
 fig, scat = plt.subplots()
-scat.scatter(ns.points['position'][:,0],ns.points['position'][:,1], c = np.exp(ns.points['logL']), cmap='plasma')
+scat.scatter(ns.points['position']['a'],ns.points['position']['b'], c = np.exp(ns.points['logL']), cmap='plasma')
 plt.show()

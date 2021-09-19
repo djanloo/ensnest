@@ -198,7 +198,8 @@ class NestedSampler:
         self.error_estimate_time = time() - start
 
     def varenv_points(self):
-        self.points['position'] = self.points.view(self.model.position_t)
+        var_names_specified_t = np.dtype([ ('position', self.model.position_t), ('logL',np.float64), ('logP', np.float64) ])
+        self.points = self.points.view(var_names_specified_t)
 
     def check_prior_sampling(self, logL, evosteps, nsamples):
         """Samples the prior over a given likelihood threshold with different steps of evolution.
