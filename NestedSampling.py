@@ -155,7 +155,6 @@ class NestedSampler(mp.Process):
         return min((progress - self.progress_offset)/(-self.progress_offset),1.)
 
     def update(self):
-        print(f'test {np.random.uniform(0,1,size = 5)}')
         '''Updates the value of Z given the current state.
 
         The number of live points is like:

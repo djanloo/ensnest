@@ -237,8 +237,12 @@ class Model:
 
 class Gaussian(Model):
 
-    def set_parameters(self,dim = 1):
-        self.bounds = np.array([-10,10]*dim).reshape(-1,2)
+    def __init__(self,dim=1):
+        self.dim = dim
+        super().__init__()
+
+    def set_parameters(self):
+        self.bounds = np.array([-10,10]*self.dim).reshape(-1,2)
         self.names  = ['a']
 
     @Model.auto_bound
@@ -251,7 +255,7 @@ class Gaussian(Model):
 class UniformJeffreys(Model):
 
     def set_parameters(self):
-        self.bounds = ([0.1,-5],[10,5])
+        self.bounds = ([0.1,10],[-5,5])
         self.names  = ['a','b']
         self.center = np.array([3,0])
         super().__init__()
@@ -267,7 +271,7 @@ class UniformJeffreys(Model):
 class RosenBrock(Model):
 
     def set_paramters(self):
-        self.bounds = ([-5,-1],[5,10])
+        self.bounds = ([-5,5],[-1,10])
         self.names  = ['1','2']
         self.center = np.array([3,0])
         super().__init__()
