@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 class lighthouse_model(model.Model):
 
       def set_parameters(self,data):
-          self.bounds = ([-10,0], [10,10])
-          self.names  = ['a', 'b']
+          self.bounds = [[-10,10],[0,10]]
+          self.names  = ['a','b']
           self.data   = data
 
       @model.Model.auto_bound

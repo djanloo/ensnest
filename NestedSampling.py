@@ -1,3 +1,8 @@
+'''
+The nested sampling module. In the first (and probably only) version it is mainly
+tailored onto the AIEsampler class, so there's no choice for the sampler.
+'''
+
 import numpy as np
 
 import model
@@ -12,6 +17,8 @@ from scipy.stats import kstest
 
 import os
 import pickle
+import multiprocessing as mp
+from time import sleep
 
 BAR_FMT= "{desc:<25.25}:{percentage:3.0f}%|{bar}|"
 BAR_FMT_ZSAMP= "{desc:<25.25}:{percentage:3.0f}%|{bar}|{r_bar}"
@@ -19,9 +26,13 @@ BAR_FMT_ZSAMP= "{desc:<25.25}:{percentage:3.0f}%|{bar}|{r_bar}"
 np.seterr(divide = 'ignore')
 
 
-class NestedSampler:
-
-    def __init__(self,model, nlive = 1000, npoints = np.inf, evosteps = 100, relative_precision = 1e-4, load_old = None, filename = None, evo_progress = True):
+class NestedSampler(mp.Process):
+    '''Class performing nested sampling
+    '''
+    def __init__(self,model,
+                nlive = 1000, npoints = np.inf,
+                evosteps = 100, relative_precision = 1e-4,
+                load_old = None, filename = None, evo_progress = True):
 
         #run fundamentals
         self.model      = model
@@ -56,10 +67,8 @@ class NestedSampler:
         #save/load
         self.loaded   = False
         self.load_old = load_old
-        if filename is None:
-            self.filename = 'inknest_NS' + str(hash(self)) + '.nkn'
-        else:
-            self.filename = filename
+        self.filename = 'inknest_NS' + str(hash(self)) + '.nkn' if filename is None else filename
+
         self.path = os.path.join('__inknest__',self.filename)
         self.check_saved()
 
@@ -76,8 +85,9 @@ class NestedSampler:
 
             self.progress_offset     = self.logZ - self.logdZ_max_estimate + np.log(self.relative_precision)
 
-
     def run(self):
+        '''Performs nested sampling.'''
+        
         if self.loaded:
             print('Run loaded from file')
             return
@@ -112,21 +122,20 @@ class NestedSampler:
         return min((progress - self.progress_offset)/(-self.progress_offset),1.)
 
     def update(self):
-        '''updates the value of Z given the current state.
+        '''Updates the value of Z given the current state.
 
         The number of live points is like:
 
-        nlive,(jump) 2nlive, 2nlive-1, ... ,nlive, (jump) 2nlive, ecc.
+        ``nlive``,(jump) ``2nlive``, ``2nlive-1``, ... ,``nlive``, (jump) ``2nlive``, ecc.
 
         This function is called between each pair of jumps. Uses the last ngen value
         and appends N values.
 
-        Integration is performed between the two successive times at which N = nlive (extrema included)
+        Integration is performed between the two successive times at which ``N = nlive`` (extrema included)
         so
 
-        cluster_N = [nlive, 2*nlive -1, ... , nlive]
-
-        cluster_N.shape = (nlive + 1)
+            >>> cluster_N = [nlive, 2*nlive -1, ... , nlive]
+            >>> cluster_N.shape = (nlive + 1)
         '''
         #checks if it is a normal update or a closure update
         self.logdZ_max_estimate      = self.points['logL'][-1]+ self.logX[-1]
@@ -164,14 +173,14 @@ class NestedSampler:
 
         self.elapsed_clusters += 1
 
-    def _log_worst_t_among_N(self):
+    def log_worst_t_among_N(self):
         '''Helper function to generate shrink factors
 
         Since max({t}) with t in [0,1], len({t}) = N
         is distributed as Nt**(N-1), the cumulative function is y = t**(N)
         and sampling uniformly over y gives the desired sample.
 
-        Therefore, max({t}) is equiv to (unif)**(1/N)
+        Therefore, max({t}) is equivalent to (unif)**(1/N)
 
         and log(unif**(1/N)) = 1/N*log(unif)
         '''
@@ -185,7 +194,7 @@ class NestedSampler:
         self.logZ_samples = np.zeros(Ntimes)
         logt      = np.zeros(len(self.N))
         for i in tqdm(range(Ntimes), 'computing Z samples', bar_format = BAR_FMT_ZSAMP):
-            logt = self._log_worst_t_among_N()
+            logt = self.log_worst_t_among_N()
 
             logX = np.cumsum(logt)
             logX = np.insert(logX,len(logX), -np.inf)
@@ -200,6 +209,8 @@ class NestedSampler:
         self.error_estimate_time = time() - start
 
     def varenv_points(self):
+        '''Gives usable fields to ``self.points['position']`` based on ``model.names``
+        '''
         var_names_specified_t = np.dtype([ ('position', self.model.position_t), ('logL',np.float64), ('logP', np.float64) ])
         self.points = self.points.view(var_names_specified_t)
 
@@ -266,13 +277,11 @@ class NestedSampler:
         pickle.dump(self.__dict__, out_file, -1)
 
     def load(self):
-        '''Loads an already performed run which has the same hashcode'''
         with open(self.path, 'rb') as in_file:
             tmp_dict = pickle.load(in_file)
             self.__dict__.update(tmp_dict)
 
     def check_saved(self):
-        '''Checks wether an already performed run exists and asks wether to load it or not.'''
         try:
             with open(self.path):
                 if self.load_old is None:
@@ -289,3 +298,40 @@ class NestedSampler:
     def __hash__(self):
         '''Gives the (almost) unique code for the run'''
         return hash((self.model, self.nlive, self.npoints, self.evosteps, self.relative_precision))
+
+class mpNestedSampler:
+
+    def __init__(self,*args, **kwargs):
+
+        self.nproc  = mp.cpu_count()
+        self.queue = mp.Queue()
+
+        self.processes = []
+        self.nested_samplers  = []
+
+        for i in range(self.nproc):
+            ns = NestedSampler(*args,**kwargs)
+            p  = mp.Process(target=self.execute_from_queue, args = (self.queue,))
+            self.nested_samplers.append(ns)
+            self.processes.append(p)
+
+    def execute_from_queue(self, queue):
+        ns_instance = queue.get()
+        ns_instance.run()
+        print('nested run')
+        queue.put(ns_instance.points)
+        print('put stuff in queue')
+
+    def run(self):
+        for p in self.processes:
+            p.start()
+
+        for ns in self.nested_samplers:
+            self.queue.put(ns)
+
+        for p in self.processes:
+            p.join()
+
+        while not self.queue.empty():
+            print('fetching from queue')
+            print(self.queue.get())

@@ -21,10 +21,10 @@ class Model:
 
     note
     ----
-        The log_prior and logg_likelihood functions are user defined and must have **one argument only**.
+        The ``log_prior`` and ``log_likelihood`` functions are user defined and must have **one argument only**.
 
         They also must be capable of managing (\*,\*, .., space_dimension )-shaped arrays,
-        so make sure every operation is done on the **-1 axis of input** or use ``Model.unpack_variables()``.
+        so make sure every operation is done on the **-1 axis of input** or use :func:`~model.Model.varenv`.
 
         If input is a single point of shape (space_dimension,) both the functions
         must return a float ( not a (1,)-shaped array )
@@ -35,7 +35,13 @@ class Model:
         '''
         #call the child function to set parameters
         self.set_parameters(*args)
-        self.bounds = (np.array(self.bounds[0]).astype(float), np.array(self.bounds[1]).astype(float))
+
+        #switchs between ([min1, max], [min2,max2], ..) and ([min1,min2,..],[max1,max2, ..]
+        self.bounds = np.array(self.bounds).transpose()
+        if len(self.bounds.shape) == 1: #checks (a,b) case
+            self.bounds = self.bounds[:,None]
+        self.bounds = (self.bounds[0].astype(np.float64), self.bounds[1].astype(float))
+
         if not hasattr(self, 'names'):
             self.names = []
 
@@ -230,22 +236,21 @@ class Model:
 #some simple models useful for testing
 
 class Gaussian(Model):
-    def __init__(self,dim = 1):
-        self.bounds = (-np.ones(dim)*10 ,np.ones(dim)*10 )
-        self.names  = ['a']
-        super().__init__()
 
-    #@model.Model.varenv
+    def set_parameters(self,dim = 1):
+        self.bounds = np.array([-10,10]*dim).reshape(-1,2)
+        self.names  = ['a']
+
     @Model.auto_bound
     def log_prior(self,x):
-        return 0#np.log(x['a'])
+        return 0
 
     def log_likelihood(self,x):
         return -0.5*np.sum(x**2,axis = -1)
 
 class UniformJeffreys(Model):
 
-    def __init__(self):
+    def set_parameters(self):
         self.bounds = ([0.1,-5],[10,5])
         self.names  = ['a','b']
         self.center = np.array([3,0])
@@ -261,7 +266,7 @@ class UniformJeffreys(Model):
 
 class RosenBrock(Model):
 
-    def __init__(self):
+    def set_paramters(self):
         self.bounds = ([-5,-1],[5,10])
         self.names  = ['1','2']
         self.center = np.array([3,0])
