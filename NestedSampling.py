@@ -25,6 +25,18 @@ BAR_FMT_ZSAMP= "{desc:<25.25}:{percentage:3.0f}%|{bar}|{r_bar}"
 
 np.seterr(divide = 'ignore')
 
+def log_worst_t_among(N):
+    '''Helper function to generate shrink factors
+
+    Since max({t}) with t in [0,1], len({t}) = N
+    is distributed as Nt**(N-1), the cumulative function is y = t**(N)
+    and sampling uniformly over y gives the desired sample.
+
+    Therefore, max({t}) is equivalent to (unif)**(1/N)
+
+    and log(unif**(1/N)) = 1/N*log(unif)
+    '''
+    return 1./N*np.log(np.random.uniform(0,1, size = len(N)))
 
 class NestedSampler(mp.Process):
     '''Class performing nested sampling
@@ -32,7 +44,8 @@ class NestedSampler(mp.Process):
     def __init__(self,model,
                 nlive = 1000, npoints = np.inf,
                 evosteps = 100, relative_precision = 1e-1,
-                load_old = None, filename = None, evo_progress = True):
+                load_old = None, filename = None, evo_progress = True,
+                seed = 1234):
         ''' NS initialisation.
 
         Args
@@ -70,6 +83,8 @@ class NestedSampler(mp.Process):
         self.logZ_samples  = None
         self.run_time            = None
         self.error_estimate_time = None
+        self.initialised = False
+        self.seed = seed
 
         #utils
         self.elapsed_clusters    =   0
@@ -81,6 +96,7 @@ class NestedSampler(mp.Process):
         #save/load
         self.loaded   = False
         self.load_old = load_old
+        self.run_code = hash(self)
         self.filename = 'inknest_NS' + str(hash(self)) + '.nkn' if filename is None else filename
 
         self.path = os.path.join('__inknest__',self.filename)
@@ -88,9 +104,12 @@ class NestedSampler(mp.Process):
 
         self.evo_progress = evo_progress
 
+    def initialise(self):
+        #for subprocesses: force seed update to prevent identical copies after fork
+        np.random.seed(self.seed)
         if not self.loaded:
             #initialises the sampler (AIES is the only option currently)
-            self.evo        = samplers.AIEevolver(self.model, evosteps , nwalkers = nlive).init()
+            self.evo        = samplers.AIEevolver(self.model, self.evosteps , nwalkers = self.nlive).init()
             self.points     = np.sort(self.evo.chain[self.evo.elapsed_time_index], order = 'logL')
 
             #integrate the first zone: (1-X0)*L0
@@ -98,15 +117,15 @@ class NestedSampler(mp.Process):
             self.logdZ_max_estimate      = self.points['logL'][-1]+ self.logX[-1]
 
             self.progress_offset     = self.logZ - self.logdZ_max_estimate + np.log(self.relative_precision)
+        self.initialised = True
 
     def run(self):
         '''Performs nested sampling.'''
-
+        if not self.initialised:
+            self.initialise()
         if self.loaded:
             print('Run loaded from file')
             return
-        else:
-            print(f'Starting run with code: {hash(self)}')
         start = time()
         with tqdm(total = 1., desc='nested sampling', unit_scale=True , colour = 'blue', bar_format = BAR_FMT) as pbar:
 
@@ -136,6 +155,7 @@ class NestedSampler(mp.Process):
         return min((progress - self.progress_offset)/(-self.progress_offset),1.)
 
     def update(self):
+        print(f'test {np.random.uniform(0,1,size = 5)}')
         '''Updates the value of Z given the current state.
 
         The number of live points is like:
@@ -187,19 +207,6 @@ class NestedSampler(mp.Process):
 
         self.elapsed_clusters += 1
 
-    def log_worst_t_among_N(self):
-        '''Helper function to generate shrink factors
-
-        Since max({t}) with t in [0,1], len({t}) = N
-        is distributed as Nt**(N-1), the cumulative function is y = t**(N)
-        and sampling uniformly over y gives the desired sample.
-
-        Therefore, max({t}) is equivalent to (unif)**(1/N)
-
-        and log(unif**(1/N)) = 1/N*log(unif)
-        '''
-        return 1./self.N*np.log(np.random.uniform(0,1, size = len(self.N)))
-
     def estimate_Zerror(self):
         '''Estimates the error sampling t.
         '''
@@ -208,7 +215,7 @@ class NestedSampler(mp.Process):
         self.logZ_samples = np.zeros(Ntimes)
         logt      = np.zeros(len(self.N))
         for i in tqdm(range(Ntimes), 'computing Z samples', bar_format = BAR_FMT_ZSAMP):
-            logt = self.log_worst_t_among_N()
+            logt = log_worst_t_among(self.N)
 
             logX = np.cumsum(logt)
             logX = np.insert(logX,len(logX), -np.inf)
@@ -336,13 +343,22 @@ class mpNestedSampler:
     '''
     def __init__(self,*args, **kwargs):
 
+        self.args   = args
+        self.kwargs = kwargs
+
         self.nproc              = mp.cpu_count()
         self.processes          = []
         self.nested_samplers    = []
 
+        self.logX   = None
+        self.logL   = None
+        self.N      = None
+
+        self.run_time           = None
+
         for i in range(self.nproc):
 
-            ns = NestedSampler(*args,**kwargs)
+            ns = NestedSampler(*args,**kwargs, seed = i)
             p  = mp.Process(target=self.execute_and_save, args = (ns,i))
 
             self.nested_samplers.append(ns)
@@ -352,10 +368,10 @@ class mpNestedSampler:
 
     def execute_and_save(self,ns,name):
         ns.run()
-        ns.save(subprocess_filename = f'run_{name}')
+        ns.save(subprocess_filename = f'run_{name}') #clumsy way to communicate between parent/child process
 
     def run(self):
-
+        self.run_time = time()
         for p in self.processes:
             p.start()
 
@@ -364,8 +380,53 @@ class mpNestedSampler:
 
         for i in range(self.nproc):
             with open(self.paths[i], 'rb') as in_file:
-                tmp_dict = pickle.load(in_file)
+                tmp_dict = pickle.load(in_file)     #clumsy way to communicate between parent/child process
                 self.nested_samplers[i].__dict__.update(tmp_dict)
 
-        for i in range(self.nproc):
-            print(self.nested_samplers[i].Z)
+        self.merge_all()
+        self.run_time = time() - self.run_time
+        self.estimate_Z_error()
+
+    def how_many_at_given_logL(self,N,logLs,givenlogL):
+        index = np.searchsorted(logLs,givenlogL)
+        if index == len(logLs):
+            return 1
+        return N[index]
+
+    def merge_two(self, logLa, Na, logLb, Nb):
+
+        logL = np.append(logLa, logLb)
+        logL = np.sort(logL)
+        N    = np.zeros(len(logL))
+
+        for i in range(len(logL)):
+            N[i] = self.how_many_at_given_logL(Na, logLa, logL[i]) + self.how_many_at_given_logL(Nb, logLb, logL[i])
+        return logL, N
+
+    def merge_all(self):
+        self.logL = self.nested_samplers[0].logL[1:-1]
+        self.N    = self.nested_samplers[0].N
+        for i in tqdm(range(1,self.nproc), desc='merging runs'):
+            self.logL,self.N = self.merge_two(self.logL,self.N,
+                                                self.nested_samplers[i].logL[1:-1], self.nested_samplers[i].N )
+        self.logX = -np.cumsum(1./self.N)
+        self.logX = np.insert(self.logX, [0,-1], [0, - np.inf])
+        self.logL = np.insert(self.logL, [0,-1], [-np.inf, self.logL[-1]])
+
+    def estimate_Z_error(self):
+        start = time()
+        self.logZ_samples = np.zeros(1000)
+        for i in trange(len(self.logZ_samples)):
+            logt = log_worst_t_among(self.N)
+
+            logX = np.cumsum(logt)
+            logX = np.insert(logX,len(logX), -np.inf)
+            logX = np.insert(logX,0,0)
+
+            self.logZ_samples[i]  = np.log(-np.trapz(np.exp(self.logL), x = np.exp(logX)))
+
+        self.logZ       = np.mean(self.logZ_samples)
+        self.logZ_error = np.std(self.logZ_samples)
+        self.Z          = np.exp(self.logZ)
+        self.Z_error    = self.Z*self.logZ_error
+        self.error_estimate_time = time() - start
