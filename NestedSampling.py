@@ -31,9 +31,23 @@ class NestedSampler(mp.Process):
     '''
     def __init__(self,model,
                 nlive = 1000, npoints = np.inf,
-                evosteps = 100, relative_precision = 1e-4,
+                evosteps = 100, relative_precision = 1e-1,
                 load_old = None, filename = None, evo_progress = True):
+        ''' NS initialisation.
 
+        Args
+        ----
+            model : :class:`~model.Model~
+            nlive : int
+            npoints : int
+            evosteps : int
+                the steps for which the ensemble is evolved
+            relative_precision: float
+            load_old : bool
+                specify whether to load an existing run
+
+                if not specified, the user will be asked in runtime in case an old run is found
+        '''
         #run fundamentals
         self.model      = model
         self.nlive      = nlive
@@ -87,7 +101,7 @@ class NestedSampler(mp.Process):
 
     def run(self):
         '''Performs nested sampling.'''
-        
+
         if self.loaded:
             print('Run loaded from file')
             return
@@ -113,7 +127,7 @@ class NestedSampler(mp.Process):
         self.run_time = time() - start
         self.estimate_Zerror()
         self.varenv_points()
-        self.save()
+        # self.save()
 
     def _compute_progress(self):
         progress = self.logZ - self.logdZ_max_estimate + np.log(self.relative_precision)
@@ -268,13 +282,25 @@ class NestedSampler(mp.Process):
 
         return samples, microtimes, ks_stats
 
-    def save(self):
-        try:
-            os.mkdir('__inknest__')
-        except FileExistsError:
-            pass
-        out_file = open(self.path, 'wb')
+    def save(self, subprocess_filename = None):
+        if subprocess_filename == None:
+            try:
+                os.mkdir('__inknest__')
+            except FileExistsError:
+                pass
+            path = self.path
+        else:
+            try:
+                os.mkdir(os.path.join('__inknest__',str(hash(self))))
+            except FileExistsError:
+                pass
+            path = os.path.join('__inknest__',str(hash(self)), subprocess_filename)
+
+        out_file = open(path, 'wb')
+        start = time()
         pickle.dump(self.__dict__, out_file, -1)
+        save_time = time() - start
+        print(f'saved in {save_time:.4f} s')
 
     def load(self):
         with open(self.path, 'rb') as in_file:
@@ -300,38 +326,46 @@ class NestedSampler(mp.Process):
         return hash((self.model, self.nlive, self.npoints, self.evosteps, self.relative_precision))
 
 class mpNestedSampler:
+    '''Multiprocess version of nested sampling.
 
+    Runs ``multiprocess.cpu_count()``instances of :class:`~NestedSampler` and joins them.
+
+    Args:
+
+
+    '''
     def __init__(self,*args, **kwargs):
 
-        self.nproc  = mp.cpu_count()
-        self.queue = mp.Queue()
-
-        self.processes = []
-        self.nested_samplers  = []
+        self.nproc              = mp.cpu_count()
+        self.processes          = []
+        self.nested_samplers    = []
 
         for i in range(self.nproc):
+
             ns = NestedSampler(*args,**kwargs)
-            p  = mp.Process(target=self.execute_from_queue, args = (self.queue,))
+            p  = mp.Process(target=self.execute_and_save, args = (ns,i))
+
             self.nested_samplers.append(ns)
             self.processes.append(p)
 
-    def execute_from_queue(self, queue):
-        ns_instance = queue.get()
-        ns_instance.run()
-        print('nested run')
-        queue.put(ns_instance.points)
-        print('put stuff in queue')
+        self.paths = [os.path.join('__inknest__', str(hash(self.nested_samplers[0])), f'run_{_}') for _ in range(self.nproc) ]
+
+    def execute_and_save(self,ns,name):
+        ns.run()
+        ns.save(subprocess_filename = f'run_{name}')
 
     def run(self):
+
         for p in self.processes:
             p.start()
-
-        for ns in self.nested_samplers:
-            self.queue.put(ns)
 
         for p in self.processes:
             p.join()
 
-        while not self.queue.empty():
-            print('fetching from queue')
-            print(self.queue.get())
+        for i in range(self.nproc):
+            with open(self.paths[i], 'rb') as in_file:
+                tmp_dict = pickle.load(in_file)
+                self.nested_samplers[i].__dict__.update(tmp_dict)
+
+        for i in range(self.nproc):
+            print(self.nested_samplers[i].Z)
