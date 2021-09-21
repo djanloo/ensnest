@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 class lighthouse_model(model.Model):
 
       def set_parameters(self,data):
-          self.bounds = ([-10,0], [10,10])
-          self.names  = ['a', 'b']
+          self.bounds = [[-10,10],[0,10]]
+          self.names  = ['a','b']
           self.data   = data
 
       @model.Model.auto_bound
@@ -23,11 +23,13 @@ class lighthouse_model(model.Model):
 
 x_observations = [-9.8,-8.5,9.1,9.9,7.4,-6.]
 model_        = lighthouse_model(x_observations)
-ns            = NestedSampler(model_, nlive = 1000, evosteps = 1000, load_old=False, filename = 'lighthouse.nkn')
+ns            = NestedSampler(model_, nlive = 1000, evosteps = 1000, load_old=True, filename = 'lighthouse.nkn')
 
 ns.run()
-print(ns.Z, ns.Z_error)
-
+ns.save()
+plt.plot(np.exp(ns.logL[1:-1]),ns.N)
+plt.show()
+exit()
 fig, scat = plt.subplots()
 scat.scatter(ns.points['position']['a'],ns.points['position']['b'], c = np.exp(ns.points['logL']), cmap='plasma')
 
