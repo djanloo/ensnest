@@ -5,24 +5,25 @@ Model Definition
 ````````````````
 	To define a model create a class based on :class:`model.Model` .
 
-	The ``set_parameters()`` method must specify the space bounds as a list``[ [inf1,sup1] , [inf2,sup2], .. ]``.
-	If a list of names is specified for certain variables, they can be accessed by name indexing (see :func`~model.Model.varenv`).
+	The ``set_parameters()`` method must specify the space bounds as a list ``[ [inf1,sup1] , [inf2,sup2], .. ]``.
+	If a list of names is specified for certain variables, they can be accessed by name indexing (see :func:`~model.Model.varenv`).
 	The parameters for which the name is not specified are called automatically ``var<n>``.
 	After the model initialization ``model.names`` will contain all the names.
 
 		>>> import model
 		>>> class MyModel(model.Model):
 		>>>
-		>>> 	def set_parameters(self,*args):
+		>>> 	def set_parameters(self):
 		>>> 		self.bounds = [[0,1], [0,1], [0,42]]
 		>>> 		self.names  = ['A','mu','sigma']
 
-	The model can have other attributes and ``set_parameters()`` method can have other arguments:
+	The model can have other attributes. To add them override ``__init__(self)`` and make sure to call the parent __init__():
 
-		>>> 	def set_parameters(self,data):
+		>>> 	def __init__(self,data):
 		>>> 		self.bounds = [[0,1], [0,1], [0,42]]
 		>>> 		self.names  = ['A','mu','sigma']
-		>>> 		self.data 	= data
+		>>> 		self.data   = data
+		>>> 		super().__init__()
 
 	The logarithm of likelihood and prior have to be specified as
 	class methods:
@@ -56,7 +57,7 @@ Model Definition
 
 The data type used in the models is ``['position', 'logL', 'logP']``
 
-	>>> x['position'][time,walker]
+	>>> x['position']['A'][time,walker]
 	>>> x['logL'][time,walker]
 
 in case it is necessary to reduce the data structure use ``numpy.lib.recfunctions.structured_to_unstructured``.
@@ -92,8 +93,7 @@ Other options are:
 
 	* ``npoints`` stops the computation after having generated a fixed number of points
 	* ``relative_precision``
-	* ``load_old`` loads the save of the same run (if it exists). If ``filename`` is not specified,
-	 		an *almost* unique code for the run is generated based on the features of the model and the NSampler run
+	* ``load_old`` loads the save of the same run (if it exists). If ``filename`` is not specified, an *almost* unique code for the run is generated based on the features of the model and the NSampler run
 	* ``filename`` to specify a save file
 	* ``evo_progress`` to display the progress bar for the evolutin process
 
@@ -102,3 +102,18 @@ The run is performed by ``ns.run()``, after that every computed feature is store
 	>>> ns = NestedSampling.NestedSampler(model, nlive=1000, evosteps=1000, load_old=False)
 	>>> ns.run()
 	>>> print(ns.Z, ns.Z_error, ns.points)
+
+Multiprocess Nested Sampling
+````````````````````````````
+It is performed by :class:`~NestedSampling.mpNestedSampler`. The arguments are the same of :class:`~NestedSampling.NestedSampler`.
+
+Runs ``multiprocessing.cpu_count()`` copies of nested sampling, then merges them using the `dynamic nested sampling <https://arxiv.org/abs/1704.03459>`_ merge algorithm.
+
+After running, the instance contains the merged computed variables (``logX``, ``logZ``, ecc.) and the single run variables through ``nested_samplers`` attribute:
+
+	>>> mpns = mpNestedSampler(model_, nlive = 500, evosteps = 1200, load_old=False)
+	>>> mpns.run()
+	>>> print(f'Z = {mpns.Z} +- {mpns.Z_error})
+	>>> single_runs = mpns.nested_samplers
+	>>> for ns in single_runs:
+	>>> 	print(f'Z = {ns.Z} +- {ns.Z_error})

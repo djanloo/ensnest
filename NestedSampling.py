@@ -44,9 +44,8 @@ class NestedSampler:
     '''
     def __init__(self,model,
                 nlive = 1000, npoints = np.inf,
-                evosteps = 100, relative_precision = 1e-1,
-                load_old = None, filename = None, evo_progress = True,
-                seed = 1234):
+                evosteps = 150, relative_precision = 1e-1,
+                load_old = None, filename = None, evo_progress = True):
         ''' NS initialisation.
 
         Args
@@ -85,7 +84,10 @@ class NestedSampler:
         self.run_time            = None
         self.error_estimate_time = None
         self.initialised = False
-        self.seed = seed
+
+        #multiproc
+        self.seed           = 1234
+        self.process_number = 0
 
         #utils
         self.elapsed_clusters    =   0
@@ -110,7 +112,7 @@ class NestedSampler:
         np.random.seed(self.seed)
         if not self.loaded:
             #initialises the sampler (AIES is the only option currently)
-            self.evo        = samplers.AIEevolver(self.model, self.evosteps , nwalkers = self.nlive).init()
+            self.evo        = samplers.AIEevolver(self.model, self.evosteps , nwalkers = self.nlive).init( progress_position=self.process_number)
             self.points     = np.sort(self.evo.chain[self.evo.elapsed_time_index], order = 'logL')
 
             #integrate the first zone: (1-X0)*L0
@@ -128,7 +130,7 @@ class NestedSampler:
             print('Run loaded from file')
             return
         start = time()
-        with tqdm(total = 1., desc='nested sampling', unit_scale=True , colour = 'blue', bar_format = BAR_FMT) as pbar:
+        with tqdm(total = 1., desc='nested sampling', unit_scale=True , colour = 'blue', bar_format = BAR_FMT, position = self.process_number) as pbar:
 
             #main loop
             while self.run_again:
@@ -157,18 +159,12 @@ class NestedSampler:
     def update(self):
         '''Updates the value of Z given the current state.
 
-        The number of live points is like:
+        The number of live points is of the form:
 
-        ``nlive``,(jump) ``2nlive``, ``2nlive-1``, ... ,``nlive``, (jump) ``2nlive``, ecc.
+        ``nlive``,(jump) ``2nlive-1``, ``2nlive-2``, ... , ``nlive`` , (jump) ``2nlive-1``, ecc.
 
-        This function is called between each pair of jumps. Uses the last ngen value
-        and appends N values.
-
-        Integration is performed between the two successive times at which ``N = nlive`` (extrema included)
-        so
-
-            >>> cluster_N = [nlive, 2*nlive -1, ... , nlive]
-            >>> cluster_N.shape = (nlive + 1)
+        Integration is performed between the two successive times at which ``N = nlive`` (extrema included),
+        then one extremum is excluded when saving to ``self.N``.
         '''
         #checks if it is a normal update or a closure update
         self.logdZ_max_estimate      = self.points['logL'][-1]+ self.logX[-1]
@@ -214,7 +210,7 @@ class NestedSampler:
         start = time()
         self.logZ_samples = np.zeros(N_Z_SAMPLES)
         logt      = np.zeros(len(self.N))
-        for i in tqdm(range(N_Z_SAMPLES), 'computing Z samples', bar_format = BAR_FMT_ZSAMP):
+        for i in tqdm(range(N_Z_SAMPLES), 'computing Z samples', bar_format = BAR_FMT_ZSAMP, position = self.process_number):
             logt = log_worst_t_among(self.N)
 
             logX = np.cumsum(logt)
@@ -332,13 +328,31 @@ class NestedSampler:
 class mpNestedSampler:
     '''Multiprocess version of nested sampling.
 
-    Runs ``multiprocess.cpu_count()``instances of :class:`~NestedSampler` and joins them.
+    Runs ``multiprocess.cpu_count()`` instances of :class:`~NestedSampler` and joins them.
 
-    Args:
+    Attributes
+    ----------
 
-
+        logX : np.ndarray(dtype=np.float64)
+        logL : np.ndarray(dtype=np.float64)
+        N    : np.ndarray(dtype=np.int)
+        logZ : np.float64
+        Z    : np.float64
+        logZ_error  : np.float64
+        Z_error     : np.float64
+        logZ_samples: np.ndarray(dtype=np.float64)
+        nested_samplers : list of :class:`~NestedSampler`
+            The individual runs. Each nested sampler has completely defined attributes.
+        run_time : np.float64
+            The time required to perform the runs and merge them.
+        error_estimate_time: np.float64
+            The time required to perform error estimate on ``logZ``
     '''
+
     def __init__(self,*args, **kwargs):
+        '''
+        Takes the same arguments of ``NestedSampler``.
+        '''
 
         self.args   = args
         self.kwargs = kwargs
@@ -355,7 +369,9 @@ class mpNestedSampler:
 
         for i in range(self.nproc):
 
-            ns = NestedSampler(*args,**kwargs, seed = i)
+            ns = NestedSampler(*args,**kwargs)
+            ns.process_number = i
+            ns.seed           = i #solves identical runs bug
             p  = mp.Process(target=self.execute_and_save, args = (ns,i))
 
             self.nested_samplers.append(ns)
@@ -385,13 +401,16 @@ class mpNestedSampler:
         self.estimate_Z_error()
 
     def how_many_at_given_logL(self,N,logLs,givenlogL):
+        '''Helper function that does what the name says.
+
+        See `dynamic nested sampling <https://arxiv.org/abs/1704.03459>`_.
+        '''
         index = np.searchsorted(logLs,givenlogL)
         if index == len(logLs):
             return 1
         return N[index]
 
     def merge_two(self, logLa, Na, logLb, Nb):
-
         logL = np.append(logLa, logLb)
         logL = np.sort(logL)
         N    = np.zeros(len(logL))

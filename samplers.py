@@ -69,7 +69,7 @@ class AIESampler(Sampler):
 
         y = x_j + z (x_k - x_j)
 
-    and then executes a MH-acceptance over y (more information at <https://msp.org/camcos/2010/5-1/camcos-v5-n1-p04-p.pdf>).
+    and then executes a MH-acceptance over y (more information `here <https://msp.org/camcos/2010/5-1/camcos-v5-n1-p04-p.pdf>`_).
 
     '''
 
@@ -216,8 +216,8 @@ class AIEevolver(AIESampler):
         self.steps = steps
         self.start_ensemble  = self.chain[0]
 
-    def init(self):
-        for i in tqdm(range(self.steps), desc = 'initialising sampler', colour = 'green', bar_format = BAR_FMT):
+    def init(self,progress_position = 0):
+        for i in tqdm(range(self.steps), desc = 'initialising sampler', colour = 'green', bar_format = BAR_FMT, position = progress_position):
             self.AIEStep(continuous = True)
         return self
 

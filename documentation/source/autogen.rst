@@ -10,8 +10,8 @@ Model
 .. automodule:: model
 	:special-members: __init__
 	:members:
-	
-	
+
+
 Samplers
 --------
 
