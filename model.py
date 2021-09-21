@@ -1,7 +1,7 @@
 import numpy as np
 from timeit import default_timer as timer
 
-N_TIME_EVAL = 100
+N_TIME_EVAL = 1000
 
 MULTIWALKER_TEST_SHAPE  = (4,3)
 TEST_SHAPE              = (3,)
@@ -116,7 +116,10 @@ class Model:
         result2 = self.log_likelihood(dummy2)
 
         if not (result1 == result2).any():
-            raise ValueError('Bad-behaving log_likelihood: different results for different iteration order')
+            op1 = [f'logL{_}' for _ in dummy2]
+            op2 = f'logL({dummy2})'
+            compare = f'\n{op1} = {result1}\n{op2} = {result2}'
+            raise ValueError('Bad-behaving log_likelihood: different results for different iteration order' + compare)
 
         #estimates the time required for the evaluation of log_likelihood and log_prior
         testshape = MULTIWALKER_TEST_SHAPE
