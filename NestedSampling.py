@@ -22,6 +22,7 @@ from time import sleep
 
 BAR_FMT= "{desc:<25.25}:{percentage:3.0f}%|{bar}|"
 BAR_FMT_ZSAMP= "{desc:<25.25}:{percentage:3.0f}%|{bar}|{r_bar}"
+N_Z_SAMPLES=1000
 
 np.seterr(divide = 'ignore')
 
@@ -38,7 +39,7 @@ def log_worst_t_among(N):
     '''
     return 1./N*np.log(np.random.uniform(0,1, size = len(N)))
 
-class NestedSampler(mp.Process):
+class NestedSampler:
     '''Class performing nested sampling
     '''
     def __init__(self,model,
@@ -90,7 +91,7 @@ class NestedSampler(mp.Process):
         self.elapsed_clusters    =   0
         self.N_continue          =   np.flip( np.append( np.arange(self.nlive, 2*self.nlive , dtype=np.int) , [self.nlive] ))
         self.delta_logX_continue = - np.cumsum(1./self.N_continue)
-        self.N_closure           =   np.flip( np.arange(1, self.nlive+1, dtype=np.int) )
+        self.N_closure           =   np.flip( np.append( np.arange(1 , 2*self.nlive , dtype=np.int) , [self.nlive] ))
         self.delta_logX_closure  = - np.cumsum(1./self.N_closure)
 
         #save/load
@@ -135,7 +136,6 @@ class NestedSampler(mp.Process):
                 insert_index    = np.searchsorted(self.points['logL'],new['logL'])
                 self.points     = np.insert(self.points, insert_index, new)
                 self.points     = np.sort(self.points, order = 'logL') #because searchsorted fails sometimes
-
                 self.evo.reset(start = self.points[-self.nlive:])      #restarts the sampler giving last live points as initial ensemble
 
                 self.update()
@@ -146,7 +146,7 @@ class NestedSampler(mp.Process):
         self.run_time = time() - start
         self.estimate_Zerror()
         self.varenv_points()
-        # self.save()
+        # self.save() #doesn't save automatically to prevent from subprocess conflicts
 
     def _compute_progress(self):
         progress = self.logZ - self.logdZ_max_estimate + np.log(self.relative_precision)
@@ -189,11 +189,13 @@ class NestedSampler(mp.Process):
             self.logX = np.append(self.logX, _logX[:-1])
             self.logL = np.append(self.logL, _logL[:-1])
             self.N    = np.append(self.N,    self.N_continue[:-1])
+
         else:
+
             _logX = self.logX[-1] + self.delta_logX_closure
             _logX = np.append(_logX, [-np.inf] )
 
-            _logL = self.points['logL'][-self.nlive:]
+            _logL = self.points['logL'][self.elapsed_clusters*self.nlive:]
             _logL = np.append(_logL, [_logL[-1]])
 
             #stores everything, extrema included
@@ -209,11 +211,10 @@ class NestedSampler(mp.Process):
     def estimate_Zerror(self):
         '''Estimates the error sampling t.
         '''
-        Ntimes = 1000
         start = time()
-        self.logZ_samples = np.zeros(Ntimes)
+        self.logZ_samples = np.zeros(N_Z_SAMPLES)
         logt      = np.zeros(len(self.N))
-        for i in tqdm(range(Ntimes), 'computing Z samples', bar_format = BAR_FMT_ZSAMP):
+        for i in tqdm(range(N_Z_SAMPLES), 'computing Z samples', bar_format = BAR_FMT_ZSAMP):
             logt = log_worst_t_among(self.N)
 
             logX = np.cumsum(logt)
@@ -303,10 +304,7 @@ class NestedSampler(mp.Process):
             path = os.path.join('__inknest__',str(hash(self)), subprocess_filename)
 
         out_file = open(path, 'wb')
-        start = time()
         pickle.dump(self.__dict__, out_file, -1)
-        save_time = time() - start
-        print(f'saved in {save_time:.4f} s')
 
     def load(self):
         with open(self.path, 'rb') as in_file:
@@ -405,7 +403,7 @@ class mpNestedSampler:
     def merge_all(self):
         self.logL = self.nested_samplers[0].logL[1:-1]
         self.N    = self.nested_samplers[0].N
-        for i in tqdm(range(1,self.nproc), desc='merging runs'):
+        for i in tqdm(range(1,self.nproc), desc='merging runs', bar_format=BAR_FMT):
             self.logL,self.N = self.merge_two(self.logL,self.N,
                                                 self.nested_samplers[i].logL[1:-1], self.nested_samplers[i].N )
         self.logX = -np.cumsum(1./self.N)
@@ -414,8 +412,8 @@ class mpNestedSampler:
 
     def estimate_Z_error(self):
         start = time()
-        self.logZ_samples = np.zeros(1000)
-        for i in trange(len(self.logZ_samples)):
+        self.logZ_samples = np.zeros(N_Z_SAMPLES)
+        for i in tqdm(range(len(self.logZ_samples)), desc='generating Z samples', bar_format=BAR_FMT_ZSAMP):
             logt = log_worst_t_among(self.N)
 
             logX = np.cumsum(logt)
