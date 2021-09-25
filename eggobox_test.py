@@ -20,7 +20,7 @@ class eggbox(model.Model):
 
 model_ = eggbox()
 
-mpns = NestedSampling.mpNestedSampler(model_, nlive=500, evosteps=4000, evo_progress=False)
+mpns = NestedSampling.mpNestedSampler(model_, nlive=500, evosteps=4000, evo_progress=False, filename='eggobox', load_old = True)
 mpns.run()
 print(f'run_time = {mpns.run_time}')
 

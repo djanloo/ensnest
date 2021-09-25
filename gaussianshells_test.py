@@ -40,7 +40,7 @@ class gshell(model.Model):
 
 model_ = gshell()
 
-mpns = NestedSampling.mpNestedSampler(model_, nlive=1000, evosteps=4000, evo_progress=False)
+mpns = NestedSampling.mpNestedSampler(model_, nlive=1000, evosteps=4000, load_old=True, filename='gaussian_shells')
 mpns.run()
 print(f'run_time = {mpns.run_time}')
 
@@ -52,6 +52,9 @@ for ns in mpns.nested_samplers:
 
 plt.figure(2)
 plt.plot(mpns.logX, mpns.logL)
+
+plt.figure(3)
+plt.plot(mpns.nested_samplers[1].points['position']['a'])
 
 print(mpns.logZ, mpns.logZ_error)
 plt.show()

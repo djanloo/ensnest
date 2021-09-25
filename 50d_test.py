@@ -4,9 +4,21 @@ from NestedSampling import mpNestedSampler as mpns
 import matplotlib.pyplot as plt
 import utils
 
-model_ = model.Gaussian(dim=5)
+class mGaussian(model.Model):
 
-result         = mpns(model_, nlive = 500, evosteps = 600, load_old=False, evo_progress = False)
+    def set_parameters(self):
+        self.bounds = np.array([-2.8,2.8]*50).reshape(-1,2)
+
+    @model.Model.auto_bound
+    def log_prior(self,x):
+        return 0
+
+    def log_likelihood(self,x):
+        return -0.5*np.sum(x**2,axis = -1)
+
+model_ = mGaussian()
+
+result         = mpns(model_, nlive = 1000, evosteps = 8000, load_old=True, evo_progress = False, filename = '50d')
 result.run()
 for ns in result.nested_samplers:
     print(f'single integral = {ns.Z*model_.volume} +- {ns.Z_error*model_.volume}')

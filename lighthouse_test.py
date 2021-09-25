@@ -1,7 +1,8 @@
 import numpy as np
 import model
-from NestedSampling import NestedSampler
+from NestedSampling import NestedSampler, mpNestedSampler
 import matplotlib.pyplot as plt
+import stdplots
 
 class lighthouse_model(model.Model):
 
@@ -23,14 +24,11 @@ class lighthouse_model(model.Model):
 
 x_observations = [-9.8,-8.5,9.1,9.9,7.4,-6.]
 model_        = lighthouse_model(x_observations)
-ns            = NestedSampler(model_, nlive = 1000, evosteps = 1000, load_old=True, filename = 'lighthouse.nkn')
+ns            = mpNestedSampler(model_, nlive = 5000, evosteps = 500, load_old=True, filename='lighthouse')
 
 ns.run()
-ns.save()
-plt.plot(np.exp(ns.logL[1:-1]),ns.N)
-plt.show()
-exit()
-fig, scat = plt.subplots()
-scat.scatter(ns.points['position']['a'],ns.points['position']['b'], c = np.exp(ns.points['logL']), cmap='plasma')
-
+# stdplots.XLplot(ns)
+# stdplots.hist_points(ns)
+# stdplots.scat(ns)
+plt.scatter(ns.points['position']['a'],ns.points['position']['b'], c = ns.weigths, cmap = 'plasma',s = 10)
 plt.show()

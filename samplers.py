@@ -81,8 +81,8 @@ class AIESampler(Sampler):
         if self.space_scale is None:
             self.space_scale = 0.5*np.sqrt(np.sum(self.model.bounds[0]**2)) + 0.5*np.sqrt(np.sum(self.model.bounds[1]**2))
         if self.space_scale <= 1:
-            print('space scale parameter must be > 1: set 2x')
-            self.space_scale *= 2
+            print('space scale parameter must be > 1: set 2')
+            self.space_scale = 2
 
         self.duplicate_ratio = None
 
@@ -180,6 +180,7 @@ class AIESampler(Sampler):
         else:
             print('DBG: restarting from nothing')
             exit()
+        return self
 
     def join_chains(self, burn_in = 0.02):
         '''Joins the chains for the ensemble after removing  ``burn_in`` \% of each single_particle chain.
@@ -287,6 +288,7 @@ class AIEevolver(AIESampler):
                 self.reset(start = sorted[-self.nwalkers:])
                 pbar.n = np.exp(min(logLmin, logLthreshold) - logLthreshold  )
                 pbar.refresh()
+        return self
 
     def _force_steps_number(self,steps):
         self.steps = steps
