@@ -1,5 +1,9 @@
 import numpy as np
+from numpy.random import uniform as U
 import samplers
+import model
+
+from tqdm import tqdm, trange
 
 class mixtureAIESampler(samplers.AIESampler):
     '''An AIE sampler for mixtures of pdf.
@@ -11,11 +15,11 @@ class mixtureAIESampler(samplers.AIESampler):
 
         super().__init__(model, mcmc_length, nwalkers, verbosity=verbosity, space_scale = space_scale)
 
-        self.chain_j = np.zeros((mcmc_length, nwalkers))    # for each point, memorize the j of the pdf sampled
+        self.chain_j    = np.zeros((mcmc_length, nwalkers), dtype = np.int) # for each point, memorize the j of the pdf sampled
         self.level_logL = np.array([-np.inf])               # the array of the likelihoods for each level
         self.level_logX = np.array([0.])                    # estimated log(prior mass) for each level
-        self.J      = 0                                     # max level number
-        self.Lambda = 1
+        self.J          = 0                                 # max level number
+        self.Lambda     = 1                                 # exp weighting constant
 
     def AIEStep(self, continuous=False):
         '''Single step of mixtureAIESampler. Overrides the parent class method.
@@ -44,16 +48,17 @@ class mixtureAIESampler(samplers.AIESampler):
         j     = self.chain_j[t_now]
         new_j = j + np.random.choice([-1,1], size = self.nwalkers)
 
-        #automatically refuse if the level does not exist yet
-        new_j[new_j > self.J] -=1
+        #automatically refuse if the level does not exist (yet)
+        new_j[new_j > self.J] -= 1
+        new_j[new_j <      0]  = 0
 
-        log_accept_prob_j = (new_j-j)/self.Lambda - self.level_logX[new_j] + sel.level_logX[j] #exponential weights
+        log_accept_prob_j = (new_j-j)/self.Lambda - self.level_logX[new_j] + self.level_logX[j] #exponential weights
 
-        accepted_j  = ( log_accept_prob > np.log(U(0,1,size = self.nwalkers)) )
+        accepted_j  = ( log_accept_prob_j > np.log(U(0,1,size = self.nwalkers)) )
         self.chain_j[t_next, accepted_j]                    = new_j[accepted_j]
         self.chain_j[t_next, np.logical_not(accepted_j)]    = j[np.logical_not(accepted_j)]
 
-        logL_thresholds = self.levels_logL[self.chain_j[t_next]]
+        logL_thresholds = self.level_logL[self.chain_j[t_next]]
 
         # STANDARD AIEStep -----------------------------------------------
         #considers the whole ensamble at a time
@@ -102,12 +107,52 @@ class mixtureAIESampler(samplers.AIESampler):
         """Fills the chain by sampling the mixture.
         """
         if progress:
-            desc = 'sampling prior'
-            if Lthreshold is not None:
-                desc += f' over logL > {Lthreshold:.2f}'
+            desc = 'sampling mixture'
             for t in tqdm(range(self.elapsed_time_index, self.length - 1), desc = desc):
                 self.AIEStep()
         else:
             for t in range(self.elapsed_time_index, self.length - 1):
                 self.AIEStep()
         return self
+
+class DiffusiveNestedSampler:
+
+    def __init__(self, model,max_n_levels = 100, nlive = 100):
+
+        self.model          = model
+        self.nlive          = nlive
+        self.max_n_levels   = max_n_levels
+        self.n_levels       = 0
+        self.level_logL     = np.array([-np.inf])
+        self.level_logX     = np.array([0])
+
+        self.sampler        = mixtureAIESampler(self.model, 10, nwalkers = nlive)
+
+    def update_sampler(self):
+        self.sampler.level_logL = self.level_logL
+        self.sampler.level_logX = self.level_logX
+        self.sampler.J          = self.n_levels
+
+    def run(self):
+
+        while self.n_levels < self.max_n_levels:
+            new = self.sampler.sample_prior().chain['logL']
+
+            new_level_logL  = np.quantile(new, 0.63)
+
+            self.level_logL = np.append(self.level_logL, new_level_logL)
+            self.level_logX = np.append(self.level_logX, self.level_logX[-1] - 1 )
+            self.n_levels   += 1
+            self.update_sampler()
+            self.sampler.reset(start = self.sampler.chain[self.sampler.elapsed_time_index])
+
+        Z = np.trapz(np.exp(self.level_logL), x = np.exp(self.level_logX))
+        print(Z*self.model.volume)
+
+def main():
+    import matplotlib.pyplot as plt
+    M   = model.Gaussian(2)
+    dns = DiffusiveNestedSampler(M, nlive = 1000, max_n_levels = 1000)
+    dns.run()
+    plt.plot(dns.level_logL)
+    plt.show()

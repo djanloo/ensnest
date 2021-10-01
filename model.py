@@ -261,7 +261,6 @@ class UniformJeffreys(Model):
         self.bounds = ([0.1,10],[-5,5])
         self.names  = ['a','b']
         self.center = np.array([3,0])
-        super().__init__()
 
     @Model.auto_bound
     @Model.varenv

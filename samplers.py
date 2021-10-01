@@ -78,7 +78,7 @@ class AIESampler(Sampler):
         super().__init__(model, mcmc_length, nwalkers, verbosity=verbosity)
         #if space_scale is not defined takes the 'diameter' of the space
         self.space_scale = space_scale if space_scale is not None else 0.5*np.sqrt(np.sum(self.model.bounds[0]**2)) + 0.5*np.sqrt(np.sum(self.model.bounds[1]**2))
-
+        print(f'sampler initialised with a-parameter = {self.space_scale:.2f}')
         if self.space_scale <= 1:
             print('space scale parameter must be > 1: set 2')
             self.space_scale = 2.
