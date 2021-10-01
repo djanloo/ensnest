@@ -74,7 +74,7 @@ class NestedSampler:
         self.logL       = np.array([-np.inf],   dtype=np.float64)
         self.N          = np.array([],          dtype=np.int)
         self.logdZ      = None
-        self.weigths    = None
+        self.weights    = None
         self.npoints    = npoints
 
         #errors and time log
@@ -86,7 +86,7 @@ class NestedSampler:
         self.error_estimate_time = None
         self.initialised = False
 
-        #multiproc
+        #mpNestedSampler compatibility
         self.seed           = 1234
         self.process_number = 0
 
@@ -101,22 +101,22 @@ class NestedSampler:
         self.loaded   = False
         self.load_old = load_old
         self.run_code = hash(self)
-
         self.filename = str(self.run_code) if filename is None else filename
         self.path     = os.path.join('__inknest__',self.filename)
-        self.check_saved()
 
+        self.check_saved()
         self.evo_progress = evo_progress
 
     def initialise(self):
-        #for subprocesses: force seed update to prevent identical copies after fork
+        '''Initialises the evolver and Z value'''
+        #for subprocesses: force seed update to prevent identical copies after process fork
         np.random.seed(self.seed)
         if not self.loaded:
             #initialises the sampler (AIES is the only option currently)
             self.evo        = samplers.AIEevolver(self.model, self.evosteps , nwalkers = self.nlive).init( progress_position=self.process_number)
             self.points     = np.sort(self.evo.chain[self.evo.elapsed_time_index], order = 'logL')
 
-            #integrate the first zone: (1-X0)*L0
+            #integrate the first zone: (1-<X0>)*L0
             self.logZ = utils.logsubexp(0,-1./self.nlive) + self.points['logL'][0]
             self.logdZ_max_estimate      = self.points['logL'][-1]+ self.logX[-1]
 
@@ -148,6 +148,7 @@ class NestedSampler:
         plt.show()
         self.run_time = time() - start
         self.mean_over_t()
+        self.get_ew_samples()
         self.varenv_points()
         self.save()
 
@@ -206,14 +207,14 @@ class NestedSampler:
         self.elapsed_clusters += 1
 
     def mean_over_t(self):
-        '''Computes the mean and std of logZ and weigths over t.
+        '''Computes the mean and std of logZ and weights over t.
 
         The process of finding the worst among n values is simulated and
         the mean over N_Z_SAMPLES is computed.
         '''
         start = time()
         self.logZ_samples = np.zeros(N_Z_SAMPLES)
-        self.weigths      = np.zeros(len(self.points))
+        self.weights      = np.zeros(len(self.points))
         logt      = np.zeros(len(self.N))
         for i in tqdm(range(N_Z_SAMPLES), 'computing Z samples', bar_format = BAR_FMT_ZSAMP, position = self.process_number):
             logt = log_worst_t_among(self.N)
@@ -223,7 +224,7 @@ class NestedSampler:
             logX = np.insert(logX,0,0)
 
             self.logZ_samples[i]  = np.log(-np.trapz(np.exp(self.logL), x = np.exp(logX)))
-            self.weigths          -= np.exp(self.logL[1:-1])*np.diff(np.exp(logX[1:]))/np.exp(self.logZ_samples[i])/N_Z_SAMPLES # <L_i * w_i / Z >t
+            self.weights          -= np.exp(self.logL[1:-1])*np.diff(np.exp(logX[1:]))/np.exp(self.logZ_samples[i])/N_Z_SAMPLES # <L_i * w_i / Z >t
 
         self.logZ       = np.mean(self.logZ_samples)
         self.logZ_error = np.std(self.logZ_samples)
@@ -232,68 +233,20 @@ class NestedSampler:
 
         self.error_estimate_time = time() - start
 
+    def get_ew_samples(self):
+        '''Generates equally weghted samples by accept/reject strategy.
+        '''
+        K = np.max(self.weights)
+        accepted = (self.weights/K > np.random.uniform(0,1,size = len(self.points)))
+        self.ew_samples = self.points[accepted]
+
 
     def varenv_points(self):
         '''Gives usable fields to ``self.points['position']`` based on ``model.names``
         '''
         var_names_specified_t = np.dtype([ ('position', self.model.position_t), ('logL',np.float64), ('logP', np.float64) ])
-        self.points = self.points.view(var_names_specified_t)
-
-    def check_prior_sampling(self, logL, evosteps, nsamples):
-        """Samples the prior over a given likelihood threshold with different steps of evolution.
-
-        Can be useful in estimating the steps necessary for convergence to the real distribution.
-
-        At first it brings the sample from being uniform to being over threshold,
-        then it evolves sampling over the threshold for ``evosteps[i]`` times,
-        then takes the last generated points (``sampler.chain[sampler.elapsed_time_index]``)
-        and adds them to the sample to be returned.
-
-        Since it has almost nothing to do with NS should be moved in samplers section.
-
-        Args
-        ----
-            logL : float
-                the log of likelihood threshold
-            evosteps : ``int`` or array of ``int``
-                the steps of evolution performed for sampling
-            nsamples : int
-                the number of samples taken from ``sampler.chain[sampler.elapsed_time_index]``
-
-        Returns:
-            np.ndarray : samples
-        """
-
-        evosteps = np.array(evosteps)
-        samp     = samplers.AIEevolver(self.model, 100, nwalkers = self.nlive)
-
-        samp.bring_over_threshold(logL)
-        starting_points = samp.chain[samp.elapsed_time_index]
-
-        samples      = np.zeros((len(evosteps),nsamples, self.model.space_dim))
-        microtimes   = np.zeros(len(evosteps))
-
-        for i in tqdm(range(len(evosteps)), desc='checking LCPS', bar_format = BAR_FMT):
-            samp._force_steps_number(evosteps[i])
-            points  = starting_points
-            start   = time()
-            with tqdm(total = nsamples, desc = f'[test] sampling prior (evosteps = {evosteps[i]:4})', colour = 'green', leave = False) as pbar:
-                while len(points) < nsamples:
-                    new     = samp.get_new(logL, progress = False, allow_resize = False)
-                    points  = np.append(points,new)
-                    samp.reset(start = new) #check what happens if you say start = last sorted points
-                    pbar.update(len(new))
-
-            microtimes[i]   = (time() - start)/len(points)*1e6
-            samples[i,:]    = points['position'][:nsamples]
-
-        ks_stats = np.zeros((len(evosteps)-1,self.model.space_dim))
-        for run_i in range(len(evosteps)-1):
-            for axis in range(self.model.space_dim):
-                pval = list(kstest(samples[run_i,:,axis] , samples[run_i+1,:,axis]))[1]
-                ks_stats[run_i,axis] = pval
-
-        return samples, microtimes, ks_stats
+        self.points     = self.points.view(var_names_specified_t)
+        self.ew_samples = self.ew_samples.view(var_names_specified_t)
 
     def save(self):
         try:
@@ -355,20 +308,27 @@ class mpNestedSampler(NestedSampler):
         Takes the same arguments of ``NestedSampler``.
         '''
 
+        #NestedSampler arguments
         self.args   = args
         self.kwargs = kwargs
 
+        #samplers
         self.nproc              = mp.cpu_count()
         self.processes          = []
         self.nested_samplers    = []
         self.process_number     = 0 # for subclass compatibility
 
+        #merged run attributes
         self.model  = args[0]
         self.logX   = None
         self.logL   = None
         self.N      = None
         self.points = None
+        self.means  = None
+        self.stds   = None
+        self.ew_samples = None
 
+        #save/load an time log
         self.run_time = None
         self.load_old = False if 'load_old' not in kwargs else kwargs['load_old']
         self.loaded   = False
@@ -378,6 +338,7 @@ class mpNestedSampler(NestedSampler):
         #shuts down evo_progress
         kwargs['evo_progress'] = False
         self.check_saved()
+
         if not self.loaded:
             for i in range(self.nproc):
 
@@ -407,7 +368,7 @@ class mpNestedSampler(NestedSampler):
         for p in self.processes:
             p.join()
 
-        del self.processes
+        del self.processes  #as they are unsavable
 
         #recovers nested samplers from save file
         for ns in self.nested_samplers:
@@ -416,9 +377,11 @@ class mpNestedSampler(NestedSampler):
                 ns.__dict__.update(tmp_dict)
 
         self.merge_all()
-        self.run_time = time() - self.run_time
         self.mean_over_t()
+        self.param_stats()
+        self.run_time = time() - self.run_time
         self.save()
+        print(f'Executed in {utils.hms(self.run_time)} ({len(self.points)} samples - {len(self.ew_samples)} e.w. samples)')
 
     def how_many_at_given_logL(self,N,logLs,givenlogL):
         '''Helper function that does what the name says.
@@ -440,6 +403,7 @@ class mpNestedSampler(NestedSampler):
         return logL, N
 
     def merge_all(self):
+        '''Merges all the runs'''
         self.logL = self.nested_samplers[0].logL[1:-1]
         self.N    = self.nested_samplers[0].N
         for i in tqdm(range(1,self.nproc), desc='merging runs', bar_format=BAR_FMT):
@@ -452,8 +416,21 @@ class mpNestedSampler(NestedSampler):
         self.logX = np.insert(self.logX, [0,len(self.logX)], [0, - np.inf])
         self.logL = np.insert(self.logL, [0,len(self.logL)], [-np.inf, self.logL[-1]])
 
-        # merges the points
-        self.points = self.nested_samplers[0].points
-        for i in range(1,self.nproc):
-            self.points = np.append(self.points, self.nested_samplers[i].points)
-        self.points = np.sort(self.points, order = 'logL')
+        # merges the points and equally weighted samples
+        self.points     = np.concatenate(tuple([ns.points     for ns in self.nested_samplers]))
+        self.points     = self.points[np.argsort(self.points['logL'])]
+        self.ew_samples = np.concatenate(tuple([ns.ew_samples for ns in self.nested_samplers]))
+        self.ew_samples = self.ew_samples[np.argsort(self.ew_samples['logL'])]
+
+
+    def param_stats(self):
+        '''Estimates the mean and standard deviation of the parameters'''
+
+        self.means  = np.sum(self.weights[:,None]*self.points['position'].copy().view((np.float64, self.model.space_dim)), axis = 0)
+        self.stds   = np.sum(self.weights[:,None]*(
+                                (self.points['position'].copy().view((np.float64, self.model.space_dim)) - self.means)**2
+                                ), axis = 0)
+        self.stds   = np.sqrt(self.stds)
+
+        self.means  = self.means.view(self.model.position_t)
+        self.stds   = self.stds.view(self.model.position_t)

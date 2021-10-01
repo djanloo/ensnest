@@ -10,8 +10,8 @@ plt.rc('font', size = 11)
 plt.rc('font', family = 'serif')
 
 
-def XLplot(NS):
-    XLfig, XLax = plt.subplots(1)
+def XLplot(NS, fig_ax = None):
+    XLfig, XLax = plt.subplots(1) if fig_ax is None else fig_ax
 
     if isinstance(NS, mpNestedSampler):
 
@@ -35,31 +35,32 @@ def XLplot(NS):
 
 
 def hist_points(NS):
+
+    Nbins = int(1 + 4*np.log(len(NS.ew_samples))) # Sturge's rule for bins' number
     for name in NS.model.names:
         fig,ax = plt.subplots(1)
-        ax.hist(NS.points['position'][name], bins = len(NS.points)//100 ,histtype = 'step', density = True, color = 'k')
+        ax.hist(NS.ew_samples['position'][name], bins = Nbins ,histtype = 'step', density = True, color = 'k', label = 'posterior')
         ax.set_xlabel(name)
 
+        ax.axvline(NS.means[name],ls = ':', color = 'k',label = 'mean')
+
         savepath = os.path.join(os.path.dirname(NS.path), f'hist-{name}.pdf')
+        ax.legend()
         plt.savefig(savepath)
 
-def scat(NS):
+def scat(NS,fig_ax = None):
+    fig,ax = plt.subplots(1) if fig_ax is None else fig_ax
     if NS.model.space_dim != 2:
         raise ValueError('Space dimension is not 2')
 
-    fig,ax = plt.subplots(1)
     scat = ax.scatter(NS.points['position'][NS.model.names[0]], NS.points['position'][NS.model.names[1]], c = np.exp(NS.points['logL']) , cmap = 'plasma', s = 10)
 
-    x_ = NS.model.data[:,0]
-    y_ =  NS.model.data[:,1]
-    ax.scatter(x_,y_, color = 'green', marker = '^')
-
-    weigthed = NS.weigths[:,None]*NS.points['position'].copy().view((np.float64, 2))
-    means = np.sum(weigthed, axis = 0)
+    weighted = NS.weights[:,None]*NS.points['position'].copy().view((np.float64, 2))
+    means = np.sum(weighted, axis = 0)
     ax.scatter(means[0],means[1],color = 'cyan')
 
     maxpost = NS.points[np.argmax(NS.points['logL'])]['position']
-    ax.scatter(maxpost[NS.model.names[0]], maxpost[NS.model.names[0]], color = 'r')
+    ax.scatter(maxpost[NS.model.names[0]], maxpost[NS.model.names[1]], color = 'r')
 
     ax.set_xlabel(NS.model.names[0])
     ax.set_ylabel(NS.model.names[1])
@@ -81,13 +82,13 @@ def scat3D(NS):
     savepath = os.path.join(os.path.dirname(NS.path), f'3Dscat.pdf')
     plt.savefig(savepath)
 
-def weigthscat(NS):
+def weightscat(NS, fig_ax = None):
+    fig, ax = plt.subplots(1) if fig_ax is None else fig_ax
     if NS.model.space_dim != 2:
         raise ValueError('Space dimension is not 2')
-    fig, ax = plt.subplots(1)
-    ax.scatter(NS.points['position'][NS.model.names[0]], NS.points['position'][NS.model.names[1]], c = NS.weigths , cmap = 'plasma')
+    ax.scatter(NS.points['position'][NS.model.names[0]], NS.points['position'][NS.model.names[1]], c = NS.weights , cmap = 'plasma', alpha = 0.9)
     ax.set_xlabel(NS.model.names[0])
     ax.set_ylabel(NS.model.names[1])
 
-    savepath = os.path.join(os.path.dirname(NS.path), f'weigthscat.pdf')
+    savepath = os.path.join(os.path.dirname(NS.path), f'weightscat.pdf')
     plt.savefig(savepath)
