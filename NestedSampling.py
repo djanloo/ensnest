@@ -145,7 +145,6 @@ class NestedSampler:
                 pbar.n = self._compute_progress()
                 pbar.refresh()
 
-        plt.show()
         self.run_time = time() - start
         self.mean_over_t()
         self.get_ew_samples()
@@ -249,6 +248,7 @@ class NestedSampler:
         self.ew_samples = self.ew_samples.view(var_names_specified_t)
 
     def save(self):
+        # print(f'saving on {self.path}')
         try:
             os.mkdir(os.path.dirname(self.path))
         except FileExistsError:
