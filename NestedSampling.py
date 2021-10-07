@@ -136,8 +136,9 @@ class NestedSampler:
             #main loop
             while self.run_again:
                 new             = self.evo.get_new(self.points['logL'][ -self.nlive], progress = self.evo_progress) #counts nlive points from maxL, takes the logL that contains all them
-                insert_index    = np.searchsorted(self.points['logL'],new['logL'])
-                self.points     = np.insert(self.points, insert_index, new)
+                #insert_index    = np.searchsorted(self.points['logL'],new['logL'])
+                #self.points     = np.insert(self.points, insert_index, new)        
+                self.points     = np.append(self.points,new)
                 self.points     = np.sort(self.points, order = 'logL') #because searchsorted fails sometimes
                 self.evo.reset(start = self.points[-self.nlive:])      #restarts the sampler giving last live points as initial ensemble
 

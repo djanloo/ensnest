@@ -7,7 +7,7 @@ import utils
 class mGaussian(model.Model):
 
     def set_parameters(self):
-        self.bounds = np.array([-2.8,2.8]*50).reshape(-1,2)
+        self.bounds = np.array([-5,5]*50).reshape(-1,2)
 
     @model.Model.auto_bound
     def log_prior(self,x):
@@ -18,7 +18,7 @@ class mGaussian(model.Model):
 
 model_ = mGaussian()
 
-result         = mpns(model_, nlive = 1000, evosteps = 8000, load_old=True, evo_progress = False, filename = '50d')
+result         = mpns(model_, nlive = 2000, evosteps = 1500, load_old=False, evo_progress = False, filename = '50d')
 result.run()
 for ns in result.nested_samplers:
     print(f'single integral = {ns.Z*model_.volume} +- {ns.Z_error*model_.volume}')

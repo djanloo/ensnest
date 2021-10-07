@@ -77,7 +77,8 @@ class AIESampler(Sampler):
 
         super().__init__(model, mcmc_length, nwalkers, verbosity=verbosity)
         #if space_scale is not defined takes the 'diameter' of the space
-        self.space_scale = space_scale if space_scale is not None else 0.5*np.sqrt(np.sum(self.model.bounds[0]**2)) + 0.5*np.sqrt(np.sum(self.model.bounds[1]**2))
+        self.space_scale = 3.
+        #self.space_scale = space_scale if space_scale is not None else 0.5*np.sqrt(np.sum(self.model.bounds[0]**2)) + 0.5*np.sqrt(np.sum(self.model.bounds[1]**2))
         # print(f'sampler initialised with a-parameter = {self.space_scale:.2f}')
         if self.space_scale <= 1:
             print('space scale parameter must be > 1: set 2')
@@ -209,7 +210,7 @@ class AIEevolver(AIESampler):
 
         #if lenght is not specified, runs continuously over two times
         if length == None:
-            length = 2
+            length = 1000
 
         super().__init__(model, length , nwalkers=nwalkers, verbosity=verbosity,space_scale = space_scale)
         self.steps = steps
@@ -244,7 +245,7 @@ class AIEevolver(AIESampler):
         #evolves the sampler at the current length
         for t in tqdm(range(self.steps), leave = False, desc = 'evolving',bar_format = BAR_FMT_EVOL, disable = not progress):
             self.AIEStep(Lthreshold = Lmin, continuous = True)
-
+        
         # this part requires a time-expensive check each loop
         # but since it is permanent it will allegedly be performed once or twice
         while True:
