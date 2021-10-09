@@ -2,6 +2,7 @@ import model
 import NestedSampling
 import numpy as np
 import matplotlib.pyplot as plt
+import stdplots
 
 
 class eggbox(model.Model):
@@ -20,7 +21,7 @@ class eggbox(model.Model):
 
 model_ = eggbox()
 
-mpns = NestedSampling.mpNestedSampler(model_, nlive=500, evosteps=4000, evo_progress=False, filename='eggobox', load_old = True)
+mpns = NestedSampling.mpNestedSampler(model_, nlive=500, evosteps=500, filename='eggobox', load_old = True)
 mpns.run()
 print(f'run_time = {mpns.run_time}')
 
@@ -30,8 +31,5 @@ ax = fig.add_subplot(projection='3d')
 for ns in mpns.nested_samplers:
     ax.scatter(ns.points['position']['a'], ns.points['position']['b'], ns.points['logL'], c = ns.points['logL'] , cmap = 'plasma')
 
-plt.figure(2)
-plt.plot(mpns.logX, mpns.logL)
-
-print(mpns.logZ, mpns.logZ_error)
+stdplots.XLplot(mpns)
 plt.show()

@@ -17,9 +17,9 @@ def XLplot(NS, fig_ax = None):
 
         for ns in NS.nested_samplers:
             path = ns.path
-            XLax.plot(ns.logX, ns.logL)
+            XLax.plot(ns.logX, ns.logL, color='k',alpha = 0.5)
 
-        XLax.plot(NS.logX, NS.logL, color = 'k', ls =':',alpha = 0.5)
+        XLax.plot(NS.logX, NS.logL, color = 'r')
 
     elif isinstance(NS, NestedSampler):
 
@@ -76,6 +76,9 @@ def scat3D(NS):
     ax = fig.add_subplot(projection = '3d')
     ax.scatter(NS.points['position'][NS.model.names[0]], NS.points['position'][NS.model.names[1]], np.exp(NS.points['logL']), c = np.exp(NS.points['logL']) , cmap = 'plasma')
     ax.set_xlabel(NS.model.names[0])
+    L = tuple([s[1]-s[0] for s in np.transpose(NS.model.bounds)])
+    L += (8,)
+    ax.set_box_aspect(L)  # aspect ratio is 1:1:1 in data space
     ax.set_ylabel(NS.model.names[1])
     ax.set_zlabel('L')
 

@@ -2,17 +2,16 @@ import model
 import numpy as np
 from NestedSampling import mpNestedSampler
 import matplotlib.pyplot as plt
+means = []
+stds = []
+for dim in np.arange(1,40):
+    M  = model.Gaussian(dim = dim)
+    ns = mpNestedSampler(M, nlive = 500, evosteps = 1500, load_old=False, filename='2dgaussian')
 
-M  = model.Gaussian(dim = 2)
-ns = mpNestedSampler(M, nlive = 1000, evosteps = 10000, load_old=False, filename='2dgaussian')
+    ns.run()
 
-ns.run()
-weigthed = ns.weigths[:,None]*ns.points['position'].copy().view((np.float64, 2))
-means = np.sum(weigthed, axis = 0)
-weigthed_sq = ns.weigths[:,None]*ns.points['position'].copy().view((np.float64, 2))**2
-std = np.sum(weigthed_sq, axis = 0) - means**2
-print(means)
-print(std)
+    means.append(np.mean(ns.means.copy().view(np.float64)))
+    stds.append(np.mean(ns.stds.copy().view(np.float64)))
 
-plt.scatter(ns.points['position']['a'], ns.points['position']['var0'], c = ns.weigths, cmap = 'plasma')
-plt.show()
+print(means, stds)
+np.savetxt('stats3.txt',(means, stds))

@@ -25,10 +25,10 @@ class lighthouse_model(model.Model):
 
 x_observations = np.array([-9.,-8.,6.,7.])
 model_        = lighthouse_model(x_observations)
-ns            = mpNestedSampler(model_, nlive = 100_000, evosteps = 500, load_old=False, filename='lighthouse')
+ns            = mpNestedSampler(model_, nlive = 100, evosteps = 500, load_old=False, filename='lighthouse')
 
 ns.run()
-#stdplots.XLplot(ns)
+stdplots.XLplot(ns)
 stdplots.hist_points(ns)
 #stdplots.scat(ns)
 #stdplots.weightscat(ns)

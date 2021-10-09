@@ -137,7 +137,7 @@ class NestedSampler:
             while self.run_again:
                 new             = self.evo.get_new(self.points['logL'][ -self.nlive], progress = self.evo_progress) #counts nlive points from maxL, takes the logL that contains all them
                 #insert_index    = np.searchsorted(self.points['logL'],new['logL'])
-                #self.points     = np.insert(self.points, insert_index, new)        
+                #self.points     = np.insert(self.points, insert_index, new)
                 self.points     = np.append(self.points,new)
                 self.points     = np.sort(self.points, order = 'logL') #because searchsorted fails sometimes
                 self.evo.reset(start = self.points[-self.nlive:])      #restarts the sampler giving last live points as initial ensemble
@@ -426,12 +426,22 @@ class mpNestedSampler(NestedSampler):
 
     def param_stats(self):
         '''Estimates the mean and standard deviation of the parameters'''
+        if self.model.space_dim == 1:
+            self.means  = np.sum(self.weights*self.points['position'][self.model.names[0]], axis = 0)
+            self.stds   = np.sum(self.weights*(
+                                    (self.points['position'][self.model.names[0]] - self.means)**2
+                                    ), axis = 0)
+            self.stds   = np.sqrt(self.stds)
 
-        self.means  = np.sum(self.weights[:,None]*self.points['position'].copy().view((np.float64, self.model.space_dim)), axis = 0)
-        self.stds   = np.sum(self.weights[:,None]*(
-                                (self.points['position'].copy().view((np.float64, self.model.space_dim)) - self.means)**2
-                                ), axis = 0)
-        self.stds   = np.sqrt(self.stds)
+            self.means  = self.means.view(self.model.position_t)
+            self.stds   = self.stds.view(self.model.position_t)
+        else:
+            num_dtype = (np.float64, self.model.space_dim)
+            self.means  = np.sum(self.weights[:,None]*self.points['position'].copy().view(num_dtype), axis = 0)
+            self.stds   = np.sum(self.weights[:,None]*(
+                                    (self.points['position'].copy().view(num_dtype) - self.means)**2
+                                    ), axis = 0)
+            self.stds   = np.sqrt(self.stds)
 
-        self.means  = self.means.view(self.model.position_t)
-        self.stds   = self.stds.view(self.model.position_t)
+            self.means  = self.means.view(self.model.position_t)
+            self.stds   = self.stds.view(self.model.position_t)

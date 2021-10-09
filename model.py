@@ -272,11 +272,9 @@ class UniformJeffreys(Model):
 
 class RosenBrock(Model):
 
-    def set_paramters(self):
-        self.bounds = ([-5,5],[-1,10])
-        self.names  = ['1','2']
-        self.center = np.array([3,0])
-        super().__init__()
+    def set_parameters(self):
+        self.bounds = ([-5.,5.],[-1,10.])
+        self.names  = ['x','y']
 
     @Model.auto_bound
     def log_prior(self,x):
@@ -284,4 +282,4 @@ class RosenBrock(Model):
 
     @Model.varenv
     def log_likelihood(self,x):
-        return - 5* (x['2'] - x['1']**2)**2 - 1./20*(1-x['1'])**2
+        return - .5* (x['y'] - x['x']**2)**2 - 1./20.*(1.-x['x'])**2
