@@ -245,7 +245,7 @@ class Gaussian(Model):
         super().__init__()
 
     def set_parameters(self):
-        self.bounds = np.array([-10,10]*self.dim).reshape(-1,2)
+        self.bounds = np.array([-5,5]*self.dim).reshape(-1,2)
         self.names  = ['a']
 
     @Model.auto_bound
@@ -258,7 +258,7 @@ class Gaussian(Model):
 class UniformJeffreys(Model):
 
     def set_parameters(self):
-        self.bounds = ([0.1,10],[-5,5])
+        self.bounds = ([0.1,10],[.1,5])
         self.names  = ['a','b']
         self.center = np.array([3,0])
 
@@ -283,3 +283,20 @@ class RosenBrock(Model):
     @Model.varenv
     def log_likelihood(self,x):
         return - .5* (x['y'] - x['x']**2)**2 - 1./20.*(1.-x['x'])**2
+
+class PhaseTransition(Model):
+
+    def set_parameters(self):
+        self.bounds = np.array([-0.5,0.5]*10).reshape(-1,2)
+        self.v = 0.1
+        self.u = 0.01
+        self.c = 0.031
+
+    @Model.auto_bound
+    def log_prior(self,x):
+        return 0
+
+    def log_likelihood(self,x):
+        A = np.prod( np.exp(- 0.5*(x/self.v)**2 )/(self.v*np.sqrt(2*np.pi))  , axis = -1)
+        B = 100*np.prod( np.exp(- 0.5*((x-self.c)/self.u)**2 )/(self.u*np.sqrt(2*np.pi)), axis = -1  )
+        return np.log(A+B)

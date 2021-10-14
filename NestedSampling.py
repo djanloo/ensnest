@@ -418,11 +418,14 @@ class mpNestedSampler(NestedSampler):
         self.logL = np.insert(self.logL, [0,len(self.logL)], [-np.inf, self.logL[-1]])
 
         # merges the points and equally weighted samples
-        self.points     = np.concatenate(tuple([ns.points     for ns in self.nested_samplers]))
-        self.points     = self.points[np.argsort(self.points['logL'])]
-        self.ew_samples = np.concatenate(tuple([ns.ew_samples for ns in self.nested_samplers]))
-        self.ew_samples = self.ew_samples[np.argsort(self.ew_samples['logL'])]
+        pts = tuple([ns.points for ns in self.nested_samplers])
+        ews = tuple([ns.ew_samples for ns in self.nested_samplers])
 
+        self.points     = np.concatenate(pts)
+        self.ew_samples = np.concatenate(ews)
+
+        self.points     = self.points[np.argsort(self.points['logL'])]
+        self.ew_samples = self.ew_samples[np.argsort(self.ew_samples['logL'])]
 
     def param_stats(self):
         '''Estimates the mean and standard deviation of the parameters'''
