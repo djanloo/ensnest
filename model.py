@@ -1,7 +1,7 @@
 import numpy as np
 from timeit import default_timer as timer
 
-N_TIME_EVAL = 100
+N_TIME_EVAL = 1000
 
 MULTIWALKER_TEST_SHAPE  = (4,3)
 TEST_SHAPE              = (3,)
@@ -21,10 +21,10 @@ class Model:
 
     note
     ----
-        The log_prior and logg_likelihood functions are user defined and must have **one argument only**.
+        The ``log_prior`` and ``log_likelihood`` functions are user defined and must have **one argument only**.
 
         They also must be capable of managing (\*,\*, .., space_dimension )-shaped arrays,
-        so make sure every operation is done on the **-1 axis of input** or use ``Model.unpack_variables()``.
+        so make sure every operation is done on the **-1 axis of input** or use :func:`~model.Model.varenv`.
 
         If input is a single point of shape (space_dimension,) both the functions
         must return a float ( not a (1,)-shaped array )
@@ -35,7 +35,13 @@ class Model:
         '''
         #call the child function to set parameters
         self.set_parameters(*args)
-        self.bounds = (np.array(self.bounds[0]).astype(float), np.array(self.bounds[1]).astype(float))
+
+        #switchs between ([min1, max], [min2,max2], ..) and ([min1,min2,..],[max1,max2, ..]
+        self.bounds = np.array(self.bounds).transpose()
+        if len(self.bounds.shape) == 1: #checks (a,b) case
+            self.bounds = self.bounds[:,None]
+        self.bounds = (self.bounds[0].astype(np.float64), self.bounds[1].astype(float))
+
         if not hasattr(self, 'names'):
             self.names = []
 
@@ -110,7 +116,10 @@ class Model:
         result2 = self.log_likelihood(dummy2)
 
         if not (result1 == result2).any():
-            raise ValueError('Bad-behaving log_likelihood: different results for different iteration order')
+            op1 = [f'logL{_}' for _ in dummy2]
+            op2 = f'logL({dummy2})'
+            compare = f'\n{op1} = {result1}\n{op2} = {result2}'
+            raise ValueError('Bad-behaving log_likelihood: different results for different iteration order' + compare)
 
         #estimates the time required for the evaluation of log_likelihood and log_prior
         testshape = MULTIWALKER_TEST_SHAPE
@@ -230,26 +239,28 @@ class Model:
 #some simple models useful for testing
 
 class Gaussian(Model):
-    def __init__(self,dim = 1):
-        self.bounds = (-np.ones(dim)*10 ,np.ones(dim)*10 )
-        self.names  = ['a']
+
+    def __init__(self,dim=1):
+        self.dim = dim
         super().__init__()
 
-    #@model.Model.varenv
+    def set_parameters(self):
+        self.bounds = np.array([-5,5]*self.dim).reshape(-1,2)
+        self.names  = ['a']
+
     @Model.auto_bound
     def log_prior(self,x):
-        return 0#np.log(x['a'])
+        return 0
 
     def log_likelihood(self,x):
         return -0.5*np.sum(x**2,axis = -1)
 
 class UniformJeffreys(Model):
 
-    def __init__(self):
-        self.bounds = ([0.1,-5],[10,5])
+    def set_parameters(self):
+        self.bounds = ([0.1,10],[.1,5])
         self.names  = ['a','b']
         self.center = np.array([3,0])
-        super().__init__()
 
     @Model.auto_bound
     @Model.varenv
@@ -259,13 +270,11 @@ class UniformJeffreys(Model):
     def log_likelihood(self,x):
         return -0.5*np.sum((x-self.center)**2,axis = -1)
 
-class RosenBrock(Model):
+class Rosenbrock(Model):
 
-    def __init__(self):
-        self.bounds = ([-5,-1],[5,10])
-        self.names  = ['1','2']
-        self.center = np.array([3,0])
-        super().__init__()
+    def set_parameters(self):
+        self.bounds = ([-5.,5.],[-1,10.])
+        self.names  = ['x','y']
 
     @Model.auto_bound
     def log_prior(self,x):
@@ -273,4 +282,21 @@ class RosenBrock(Model):
 
     @Model.varenv
     def log_likelihood(self,x):
-        return - 5* (x['2'] - x['1']**2)**2 - 1./20*(1-x['1'])**2
+        return - .5* (x['y'] - x['x']**2)**2 - 1./20.*(1.-x['x'])**2
+
+class PhaseTransition(Model):
+
+    def set_parameters(self):
+        self.bounds = np.array([-0.5,0.5]*10).reshape(-1,2)
+        self.v = 0.1
+        self.u = 0.01
+        self.c = 0.031
+
+    @Model.auto_bound
+    def log_prior(self,x):
+        return 0
+
+    def log_likelihood(self,x):
+        A = np.prod( np.exp(- 0.5*(x/self.v)**2 )/(self.v*np.sqrt(2*np.pi))  , axis = -1)
+        B = 100*np.prod( np.exp(- 0.5*((x-self.c)/self.u)**2 )/(self.u*np.sqrt(2*np.pi)), axis = -1  )
+        return np.log(A+B)

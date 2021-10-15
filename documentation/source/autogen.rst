@@ -10,8 +10,8 @@ Model
 .. automodule:: model
 	:special-members: __init__
 	:members:
-	
-	
+
+
 Samplers
 --------
 
@@ -22,6 +22,16 @@ Samplers
 NestedSampling.py
 -----------------
 .. automodule:: NestedSampling
+	:members:
+
+DiffusiveNestedSampling.py
+--------------------------
+.. automodule:: DiffusiveNestedSampling
+	:members:
+
+stdplots.py
+--------------------------
+.. automodule:: stdplots
 	:members:
 
 Utility routines

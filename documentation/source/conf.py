@@ -16,7 +16,7 @@ import mock
 sys.path.insert(0, os.path.abspath('/home/djanloo/Scrivania/BaYESiana/DNS'))
 
 
-autodoc_mock_imports = ["numpy", 'matplotlib']
+autodoc_mock_imports = ["numpy", 'matplotlib', 'scipy']
 
 # -- Project information -----------------------------------------------------
 

@@ -141,7 +141,8 @@ documentation/build/*
 omit/
 __inknest__/
 _inknest_/
-
+*.xopp
+stats*.txt
 
 #c stuff by cython
 *.c

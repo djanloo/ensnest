@@ -1,18 +1,19 @@
 import numpy as np
 import model
-from NestedSampling import NestedSampler
+from NestedSampling import NestedSampler, mpNestedSampler
 import matplotlib.pyplot as plt
-plt.rc('font', size=12)
-plt.rc('font', family='serif')
+import stdplots
+
 
 class lighthouse_model(model.Model):
 
       def set_parameters(self,data):
-          self.bounds = ([-10,0], [10,10])
-          self.names  = ['a', 'b']
+          self.bounds = [[-10,10],[0,10]]
+          self.names  = ['a','b']
           self.data   = data
 
       @model.Model.auto_bound
+      @model.Model.varenv
       def log_prior(self,vars):
           return 0
 
@@ -23,19 +24,19 @@ class lighthouse_model(model.Model):
               u += np.log(vars['b']) - np.log(vars['b']**2 + (self.data[i] - vars['a'])**2)
           return u
 
-x_observations = np.array([-9.8,-8.5,9.1,9.9,7.4,-6.])
-model_         = lighthouse_model(x_observations)
-ns             = NestedSampler(model_, nlive = 1000, evosteps = 1000, load_old=True, filename = 'lighthouse.nkn')
+x_observations = np.array([-9.,-8.,6.,7.])
+model_        = lighthouse_model(x_observations)
+ns            = mpNestedSampler(model_, nlive = 100, evosteps = 500, load_old=False, filename='lighthouse')
 
 ns.run()
-print(ns.Z, ns.Z_error)
-
-fig, scat = plt.subplots()
-scat.scatter(ns.points['position']['a'],ns.points['position']['b'], c = np.exp(ns.points['logL']), cmap='plasma')
-scat.scatter(x_observations, x_observations*0, color = (0,1,0), s = 30, marker = '<')
-scat.set_title(f'Lighthouse problem ({len(ns.points)} samples in {ns.run_time:.0f} s)')
-
-
-
+stdplots.XLplot(ns)
+stdplots.hist_points(ns)
+#stdplots.scat(ns)
+#stdplots.weightscat(ns)
+#plt.scatter(ns.points['position']['a'],ns.points['position']['b'], c = ns.weigths, cmap = 'plasma',s = 10)
+plt.figure(3)
+plt.scatter(ns.ew_samples['position']['a'], ns.ew_samples['position']['b'], c=np.exp(ns.ew_samples['logL']))
+# t = np.linspace(0,1,len(ns.points))
+# plt.scatter(ns.points['position']['a'], ns.points['position']['b'], c = t, cmap = 'plasma')
 
 plt.show()
