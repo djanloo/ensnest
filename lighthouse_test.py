@@ -4,6 +4,7 @@ from NestedSampling import NestedSampler, mpNestedSampler
 import matplotlib.pyplot as plt
 import stdplots
 
+
 class lighthouse_model(model.Model):
 
       def set_parameters(self,data):
@@ -37,4 +38,5 @@ plt.figure(3)
 plt.scatter(ns.ew_samples['position']['a'], ns.ew_samples['position']['b'], c=np.exp(ns.ew_samples['logL']))
 # t = np.linspace(0,1,len(ns.points))
 # plt.scatter(ns.points['position']['a'], ns.points['position']['b'], c = t, cmap = 'plasma')
+
 plt.show()
