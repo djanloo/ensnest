@@ -8,9 +8,4 @@ For an explaination of the algorithm see ``conceptual_notes.pdf``, for the code 
 .. warning ::
     Due to multiprocessing problems v1.0 works only under unix-based OSs.
 
-<img
-    src=“Presentazione/eggbox.png”
-    raw=true
-    alt=“Subject Pronouns”
-    style=“margin-right: 10px;”
-    />
+<img src=“Presentazione/eggbox.png” raw=true alt=“Subject Pronouns” style=“margin-right: 10px;” />
