@@ -8,4 +8,4 @@ For an explaination of the algorithm see ``conceptual_notes.pdf``, for the code 
 .. warning ::
     Due to multiprocessing problems v1.0 works only under unix-based OSs.
 
-![Fig1](Presentazione/gaussianshells.png?raw=true "Intersecting gaussian shells")
+![Fig1](./Presentazione/gaussianshells.png?raw=true "Intersecting gaussian shells")
