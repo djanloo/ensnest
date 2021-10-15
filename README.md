@@ -8,8 +8,4 @@ For an explaination of the algorithm see ``conceptual_notes.pdf``, for the code 
 .. warning ::
     Due to multiprocessing problems v1.0 works only under unix-based OSs.
 
-<<<<<<< HEAD:README.md
 ![eggbox](Presentazione/eggbox.png)
-=======
-<img src=“Presentazione/eggbox.png” raw=true alt=“Subject Pronouns” style=“margin-right: 10px;” />
->>>>>>> 78ce2a5172485a141cef40d6256af0b62688d0dd:README.rst
