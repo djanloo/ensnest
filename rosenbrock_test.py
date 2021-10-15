@@ -8,7 +8,7 @@ import scipy.integrate as integ
 def rosenbrock(x,y):
     return np.exp(- .5*(y - x**2)**2 - 1./20.*(1.- x)**2)/110.
 
-my_model = model.RosenBrock()
+my_model = model.Rosenbrock()
 x1,x2 = (-5.,5.)
 y1,y2 = (-1.,10.)
 

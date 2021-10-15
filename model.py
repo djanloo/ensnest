@@ -270,7 +270,7 @@ class UniformJeffreys(Model):
     def log_likelihood(self,x):
         return -0.5*np.sum((x-self.center)**2,axis = -1)
 
-class RosenBrock(Model):
+class Rosenbrock(Model):
 
     def set_parameters(self):
         self.bounds = ([-5.,5.],[-1,10.])

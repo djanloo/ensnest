@@ -22,7 +22,7 @@ class mixtureAIESampler(samplers.AIESampler):
         self.chain_j    = np.zeros((mcmc_length, nwalkers), dtype = np.int) # for each point, memorize the j of the pdf sampled
         self.level_logL = np.array([-np.inf])               # the array of the likelihoods for each level
         self.level_logX = np.array([0.])                    # estimated log(prior mass) for each level
-        self.Lambda     = 1.                                # exp weighting constant
+        self.Lambda     = .1                                # exp weighting constant
 
     def AIEStep(self, continuous=False, uniform_weights=False):
         '''Single step of mixtureAIESampler. Overrides the parent class method.
@@ -32,6 +32,8 @@ class mixtureAIESampler(samplers.AIESampler):
                 continuous : ``bool``, optional
                     If true use modular index assignment, overwriting past values as
                     ``self.elapsed_time_index`` > ``self.length``
+                uniform_weights : ``bool``, optional
+                    If ``True`` sets uniform weighting between levels instead of exponential.
 
             Note
             ----
@@ -112,6 +114,13 @@ class mixtureAIESampler(samplers.AIESampler):
 
     def sample_prior(self, progress = False, **kwargs):
         """Fills the chain by sampling the mixture.
+
+            Args
+            ----
+                progress : bool
+                    Displays a progress bar. Default: ``False``
+                uniform_weights : ``bool``, optional
+                    If ``True`` sets uniform weighting between levels instead of exponential.
         """
         if progress:
             desc = 'sampling mixture'
@@ -145,18 +154,12 @@ class DiffusiveNestedSampler(NestedSampler):
 
         self.n_j        = np.array([])
         self.n_exceeded = np.array([])
+        self.Ncontinue  = 50
 
     def G(self):
-        ''' theorethical cumulative density function for X,
+        ''' Theorethical cumulative density function for X,
         given that X is smaller than the last level.
-        see conceptual_notes.
-
-        Since pj(theta) = 1/Xj P(theta, Ltheta > Lj)
-        and since the mixture is
-            P(theta) = sum wj pj
-
-        the distribution from the last level to x = 0 is
-            sum wj/xj
+        see ``conceptual_notes``.
         '''
         q = 1. - self.Xratio
         return q
@@ -166,9 +169,11 @@ class DiffusiveNestedSampler(NestedSampler):
         self.sampler.level_logX = self.level_logX
 
     def run(self):
+        '''Runs the code'''
         current_logL_array = np.array([])
         with tqdm(total=self.max_n_levels, desc='generating new levels') as pbar:
             while len(self.level_logX) < self.max_n_levels:
+
                 new = self.sampler.sample_prior().join_chains(burn_in = 0.)
                 current_logL_array = np.append(current_logL_array, new['logL'])
                 new_level_logL     = np.quantile(current_logL_array, self.G())
@@ -181,21 +186,21 @@ class DiffusiveNestedSampler(NestedSampler):
                 self.sampler.reset(start = self.sampler.chain[-1])
                 self.sampler.chain_j[0] = self.sampler.chain_j[-1]
 
+                self.n_j          = np.append(self.n_j, [0])
+                self.n_exceeded  = np.append(self.n_exceeded, [0])
+
                 self.revise_X(new['logL'])
                 pbar.update(1)
+
+        plt.plot(self.n_exceeded/self.n_j, label = 'before')
+        self.continue_exploration()
+        plt.plot(self.n_exceeded/self.n_j, label = 'after')
+        plt.legend()
         plt.show()
         self.close()
 
     def revise_X(self, points_logL):
         '''Revises the X values of the levels.
-
-        Given j (thus sampling :math:`p_j`), the likelihood values found should exceed
-        :math:`L_(j+1)`` a fraction :math:`X_(j+1)/X_(j)`.
-
-        For multiparticle implementation
-
-            * takes the vector ``chain_j[t]`` from the sampler (``chain_j[t].shape == (mcmc_length, nwalkers)``)
-            * computes the bool vector ``L(points) > L(level(j[t]+1)) (L(points).shape == (mcmc_length, nwalkers))``
 
         Args
         ----
@@ -203,35 +208,35 @@ class DiffusiveNestedSampler(NestedSampler):
                 the points generated while sampling the mixture
 
         '''
-        #since last level is added AFTER the chain is run, this one will have max(j) = nlvl -2
-        #so e.g. if nlvl = 3  logX = [0.,-1., -2.]
-        #then the chain given will have max(j) = 1 (it was run when logX was [0.,-1])
-        self.n_j          = np.append(self.n_j, [0])
-        self.n_exceeded  = np.append(self.n_exceeded, [0])
-        js = self.sampler.chain_j.flatten().astype(np.int)
-        self.n_j += np.bincount(js, minlength = len(self.n_j))[np.arange(len(self.n_j))]
-        where_exceeded = points_logL > self.level_logL[js + 1]
-        np.add.at(self.n_exceeded, js[where_exceeded],1)
-        '''
-        # old code using for loop
-        for i in range(len(points_logL)):
-            # print(f'(current nlevels = {len(self.level_logX)})',end = ' ')
-            # print(f'step {i} had j = {js[i]}',end = ',')
-            self.n_j[js[i]] += 1
-            if js[i]+1 < len(self.level_logX):
-                if points_logL[i] > self.level_logL[js[i]+1]:
-                    # print(f'and {points_logL[i]} > {self.level_logL[js[i]+1]}, overcome ')
-                    self.n_exceeded[js[i]] += 1
-                else:
-                    pass
-                    #print(f'but {points_logL[i]} < {self.level_logL[js[i]+1]}, not overcome ')
-            else:
-                pass
-                #print(f'level {js[i]} doesn\'t exist yet')'''
-        delta_logX = np.log(self.n_exceeded + 100.*self.Xratio) - np.log(self.n_j + 100.)
+        # when executed after a new level is created max(j) = nlvl - 2 so max(j + 1) = nlvl -1
+        # when executed in continue mode max(j)  = nlvl - 1 and max(j+1) = nlvl, so level_logL[j+1] is out of bounds sometimes
+        # this is solved by deleting j and logL where j = nlvl - 1
+        current_level_index = self.sampler.chain_j.flatten().astype(np.int)
+
+        filter              = (current_level_index != len(self.level_logL) -1)
+        filtered_logLs      = points_logL[filter]
+        current_level_index = current_level_index[filter]
+
+        self.n_j += np.bincount(current_level_index, minlength = len(self.n_j))[np.arange(len(self.n_j))]
+        where_exceeded = filtered_logLs > self.level_logL[current_level_index + 1]
+        np.add.at(self.n_exceeded, current_level_index[where_exceeded],1)
+
+        delta_logX = np.log(self.n_exceeded + 5.*self.Xratio) - np.log(self.n_j + 5.)
         logX       = np.cumsum(delta_logX)
         logX       = np.insert(logX, 0 ,0)
         self.level_logX = logX
+
+    def continue_exploration(self):
+        '''Continues the exploration using uniform weighting.
+        '''
+        for i in trange(self.Ncontinue):
+            new = self.sampler.sample_prior(uniform_weights = True).join_chains(burn_in = 0.)
+
+            #reset sampler on last state
+            self.sampler.reset(start = self.sampler.chain[-1])
+            self.sampler.chain_j[0] = self.sampler.chain_j[-1]
+
+            self.revise_X(new['logL'])
 
     def close(self):
         print('closure operations ----------------')
@@ -246,6 +251,7 @@ class DiffusiveNestedSampler(NestedSampler):
 def main():
     M = model.UniformJeffreys()
     dns = DiffusiveNestedSampler(M, nlive = 200, max_n_levels = 100, chain_length = 200)
+    dns.Xratio = 0.95
     dns.run()
     ns = mns(M, nlive=500,evosteps=500, filename = 'aaaa', load_old = True)
     ns.run()

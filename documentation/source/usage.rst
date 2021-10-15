@@ -117,3 +117,17 @@ After running, the instance contains the merged computed variables (``logX``, ``
 	>>> single_runs = mpns.nested_samplers
 	>>> for ns in single_runs:
 	>>> 	print(f'Z = {ns.Z} +- {ns.Z_error})
+	
+Diffusive Nested Sampling
+`````````````````````````
+It is performed by :class:`~DiffusiveNestedSampling.DiffusiveNestedSampler`. The main parameters are the :class:`~model.Model` ``chain_length`` before a level is added, ``nlive`` of points the ensemble is made of and ``max_n_levels``.
+
+	>>> dns = DiffusiveNestedSampler(M, nlive = 200, max_n_levels = 100, chain_length = 200)
+
+
+The resolution in prior mass can be adjusted specifying ``dns.Xratio`` after the sampler is initialised. 
+
+
+Plotting
+````````
+In :py:mod:`~stdplots` are contained some shorthands for plotting the results for ``NS/mpNS/DNS`` runs. 

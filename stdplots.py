@@ -11,6 +11,13 @@ plt.rc('font', family = 'serif')
 
 
 def XLplot(NS, fig_ax = None):
+    '''Does the (logX, logL) plot.
+
+    Args
+    ----
+        NS : ``NS/mpNS/DNS sampler``
+
+    '''
     XLfig, XLax = plt.subplots(1) if fig_ax is None else fig_ax
 
     if isinstance(NS, mpNestedSampler):
@@ -35,7 +42,13 @@ def XLplot(NS, fig_ax = None):
 
 
 def hist_points(NS):
+    '''Plots the histogram of the equally weighted points
 
+    Args
+    ----
+        NS : ``NS/mpNS sampler``
+
+    '''
     Nbins = int(1 + 4*np.log(len(NS.ew_samples))) # Sturge's rule for bins' number
     for name in NS.model.names:
         fig,ax = plt.subplots(1)
@@ -49,6 +62,13 @@ def hist_points(NS):
         plt.savefig(savepath)
 
 def scat(NS,fig_ax = None):
+    '''Does a 2D scatter plot.
+
+    Args
+    ----
+        NS : ``NS/mpNS sampler``
+
+    '''
     fig,ax = plt.subplots(1) if fig_ax is None else fig_ax
     if NS.model.space_dim != 2:
         raise ValueError('Space dimension is not 2')
@@ -69,6 +89,13 @@ def scat(NS,fig_ax = None):
     plt.savefig(savepath)
 
 def scat3D(NS):
+    '''Does a 3D scatter plot (x,y,L).
+
+    Args
+    ----
+        NS : ``NS/mpNS sampler``
+
+    '''
     if NS.model.space_dim != 2:
         raise ValueError('Space dimension is not 2')
 
@@ -86,6 +113,13 @@ def scat3D(NS):
     plt.savefig(savepath)
 
 def weightscat(NS, fig_ax = None):
+    '''Does a 2D scatter plot using a colormap to display weighting.
+
+    Args
+    ----
+        NS : ``NS/mpNS sampler``
+
+    '''
     fig, ax = plt.subplots(1) if fig_ax is None else fig_ax
     if NS.model.space_dim != 2:
         raise ValueError('Space dimension is not 2')
