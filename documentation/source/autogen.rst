@@ -24,6 +24,16 @@ NestedSampling.py
 .. automodule:: NestedSampling
 	:members:
 
+DiffusiveNestedSampling.py
+--------------------------
+.. automodule:: DiffusiveNestedSampling
+	:members:
+
+stdplots.py
+--------------------------
+.. automodule:: stdplots
+	:members:
+
 Utility routines
 ----------------
 .. automodule:: utils

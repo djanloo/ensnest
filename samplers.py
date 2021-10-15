@@ -77,14 +77,12 @@ class AIESampler(Sampler):
 
         super().__init__(model, mcmc_length, nwalkers, verbosity=verbosity)
         #if space_scale is not defined takes the 'diameter' of the space
-        self.space_scale = space_scale
-        if self.space_scale is None:
-            self.space_scale = 0.5*np.sqrt(np.sum(self.model.bounds[0]**2)) + 0.5*np.sqrt(np.sum(self.model.bounds[1]**2))
+        self.space_scale = 3.
+        #self.space_scale = space_scale if space_scale is not None else 0.5*np.sqrt(np.sum(self.model.bounds[0]**2)) + 0.5*np.sqrt(np.sum(self.model.bounds[1]**2))
+        # print(f'sampler initialised with a-parameter = {self.space_scale:.2f}')
         if self.space_scale <= 1:
-            print('space scale parameter must be > 1: set 2x')
-            self.space_scale *= 2
-
-        self.duplicate_ratio = None
+            print('space scale parameter must be > 1: set 2')
+            self.space_scale = 2.
 
     def get_stretch(self, size = 1):
         '''
@@ -113,7 +111,7 @@ class AIESampler(Sampler):
             t_now  = t_now  % self.length
             t_next = t_next % self.length
 
-        #considers the whole ensamble at at time
+        #considers the whole ensamble at a time
         current_walker_position = self.chain[t_now,:]['position']
 
         #OPTIMIZATION: np.random.randint is really slow
@@ -180,6 +178,7 @@ class AIESampler(Sampler):
         else:
             print('DBG: restarting from nothing')
             exit()
+        return self
 
     def join_chains(self, burn_in = 0.02):
         '''Joins the chains for the ensemble after removing  ``burn_in`` \% of each single_particle chain.
@@ -207,14 +206,15 @@ class AIEevolver(AIESampler):
     The main difference from AIESampler is that ``lenght`` and ``steps`` can be different
 
     '''
-    def __init__(self, model, steps, length = None, nwalkers=10, verbosity=0):
+    def __init__(self, model, steps, length = None, nwalkers=10, verbosity=0, space_scale = None):
 
+        #if lenght is not specified, runs continuously over two times
         if length == None:
-            length = 2
+            length = 1000
 
-        super().__init__(model, length , nwalkers=nwalkers, verbosity=verbosity)
+        super().__init__(model, length , nwalkers=nwalkers, verbosity=verbosity,space_scale = space_scale)
         self.steps = steps
-        self.start_ensemble  = self.chain[0]
+        self.start_ensemble  = self.chain[0] # since most of the memory is lost, takes the initial situation for duplicate check
 
     def init(self,progress_position = 0):
         for i in tqdm(range(self.steps), desc = 'initialising sampler', colour = 'green', bar_format = BAR_FMT, position = progress_position):
@@ -232,7 +232,7 @@ class AIEevolver(AIESampler):
         args
         ----
             Lmin : float
-                the threshold likelihood that a point must have to be accepted
+                the threshold likelihood that a point must exceed to be accepted
 
         Returns:
             np.ndarray : new generated points
@@ -245,7 +245,7 @@ class AIEevolver(AIESampler):
         #evolves the sampler at the current length
         for t in tqdm(range(self.steps), leave = False, desc = 'evolving',bar_format = BAR_FMT_EVOL, disable = not progress):
             self.AIEStep(Lthreshold = Lmin, continuous = True)
-
+        
         # this part requires a time-expensive check each loop
         # but since it is permanent it will allegedly be performed once or twice
         while True:
@@ -259,7 +259,7 @@ class AIEevolver(AIESampler):
                 if not allow_resize:
                     print('CRITICAL: ensemble did not evolve due to too low number of steps (resize unallowed).')
                     exit()
-                print(f'\nWARNING: evolution steps extended to {2*self.steps}')
+                print(f'\nWARNING: evolution steps extended to {2*self.steps} ({n_duplicate} duplicates over {self.nwalkers})')
                 self.steps = 2*self.steps
                 self.get_new(Lmin, start_ensemble = self.start_ensemble)
 
@@ -287,6 +287,64 @@ class AIEevolver(AIESampler):
                 self.reset(start = sorted[-self.nwalkers:])
                 pbar.n = np.exp(min(logLmin, logLthreshold) - logLthreshold  )
                 pbar.refresh()
+        return self
 
     def _force_steps_number(self,steps):
         self.steps = steps
+
+# must be adjusted because it was in NestedSampler class
+# def check_prior_sampling(self, logL, evosteps, nsamples):
+#     """Samples the prior over a given likelihood threshold with different steps of evolution.
+#
+#     Can be useful in estimating the steps necessary for convergence to the real distribution.
+#
+#     At first it brings the sample from being uniform to being over threshold,
+#     then it evolves sampling over the threshold for ``evosteps[i]`` times,
+#     then takes the last generated points (``sampler.chain[sampler.elapsed_time_index]``)
+#     and adds them to the sample to be returned.
+#
+#     Since it has almost nothing to do with NS should be moved in samplers section.
+#
+#     Args
+#     ----
+#         logL : float
+#             the log of likelihood threshold
+#         evosteps : ``int`` or array of ``int``
+#             the steps of evolution performed for sampling
+#         nsamples : int
+#             the number of samples taken from ``sampler.chain[sampler.elapsed_time_index]``
+#
+#     Returns:
+#         np.ndarray : samples
+#     """
+#
+#     evosteps = np.array(evosteps)
+#     samp     = samplers.AIEevolver(self.model, 100, nwalkers = self.nlive)
+#
+#     samp.bring_over_threshold(logL)
+#     starting_points = samp.chain[samp.elapsed_time_index]
+#
+#     samples      = np.zeros((len(evosteps),nsamples, self.model.space_dim))
+#     microtimes   = np.zeros(len(evosteps))
+#
+#     for i in tqdm(range(len(evosteps)), desc='checking LCPS', bar_format = BAR_FMT):
+#         samp._force_steps_number(evosteps[i])
+#         points  = starting_points
+#         start   = time()
+#         with tqdm(total = nsamples, desc = f'[test] sampling prior (evosteps = {evosteps[i]:4})', colour = 'green', leave = False) as pbar:
+#             while len(points) < nsamples:
+#                 new     = samp.get_new(logL, progress = False, allow_resize = False)
+#                 points  = np.append(points,new)
+#                 samp.reset(start = new) #check what happens if you say start = last sorted points
+#                 pbar.update(len(new))
+#
+#         microtimes[i]   = (time() - start)/len(points)*1e6
+#         samples[i,:]    = points['position'][:nsamples]
+#
+#     ks_stats = np.zeros((len(evosteps)-1,self.model.space_dim))
+#     for run_i in range(len(evosteps)-1):
+#         for axis in range(self.model.space_dim):
+#             pval = list(kstest(samples[run_i,:,axis] , samples[run_i+1,:,axis]))[1]
+#             ks_stats[run_i,axis] = pval
+#
+#     return samples, microtimes, ks_stats

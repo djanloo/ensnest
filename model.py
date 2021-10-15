@@ -1,7 +1,7 @@
 import numpy as np
 from timeit import default_timer as timer
 
-N_TIME_EVAL = 100
+N_TIME_EVAL = 1000
 
 MULTIWALKER_TEST_SHAPE  = (4,3)
 TEST_SHAPE              = (3,)
@@ -116,7 +116,10 @@ class Model:
         result2 = self.log_likelihood(dummy2)
 
         if not (result1 == result2).any():
-            raise ValueError('Bad-behaving log_likelihood: different results for different iteration order')
+            op1 = [f'logL{_}' for _ in dummy2]
+            op2 = f'logL({dummy2})'
+            compare = f'\n{op1} = {result1}\n{op2} = {result2}'
+            raise ValueError('Bad-behaving log_likelihood: different results for different iteration order' + compare)
 
         #estimates the time required for the evaluation of log_likelihood and log_prior
         testshape = MULTIWALKER_TEST_SHAPE
@@ -242,7 +245,7 @@ class Gaussian(Model):
         super().__init__()
 
     def set_parameters(self):
-        self.bounds = np.array([-10,10]*self.dim).reshape(-1,2)
+        self.bounds = np.array([-5,5]*self.dim).reshape(-1,2)
         self.names  = ['a']
 
     @Model.auto_bound
@@ -255,10 +258,9 @@ class Gaussian(Model):
 class UniformJeffreys(Model):
 
     def set_parameters(self):
-        self.bounds = ([0.1,10],[-5,5])
+        self.bounds = ([0.1,10],[.1,5])
         self.names  = ['a','b']
         self.center = np.array([3,0])
-        super().__init__()
 
     @Model.auto_bound
     @Model.varenv
@@ -268,13 +270,11 @@ class UniformJeffreys(Model):
     def log_likelihood(self,x):
         return -0.5*np.sum((x-self.center)**2,axis = -1)
 
-class RosenBrock(Model):
+class Rosenbrock(Model):
 
-    def set_paramters(self):
-        self.bounds = ([-5,5],[-1,10])
-        self.names  = ['1','2']
-        self.center = np.array([3,0])
-        super().__init__()
+    def set_parameters(self):
+        self.bounds = ([-5.,5.],[-1,10.])
+        self.names  = ['x','y']
 
     @Model.auto_bound
     def log_prior(self,x):
@@ -282,4 +282,21 @@ class RosenBrock(Model):
 
     @Model.varenv
     def log_likelihood(self,x):
-        return - 5* (x['2'] - x['1']**2)**2 - 1./20*(1-x['1'])**2
+        return - .5* (x['y'] - x['x']**2)**2 - 1./20.*(1.-x['x'])**2
+
+class PhaseTransition(Model):
+
+    def set_parameters(self):
+        self.bounds = np.array([-0.5,0.5]*10).reshape(-1,2)
+        self.v = 0.1
+        self.u = 0.01
+        self.c = 0.031
+
+    @Model.auto_bound
+    def log_prior(self,x):
+        return 0
+
+    def log_likelihood(self,x):
+        A = np.prod( np.exp(- 0.5*(x/self.v)**2 )/(self.v*np.sqrt(2*np.pi))  , axis = -1)
+        B = 100*np.prod( np.exp(- 0.5*((x-self.c)/self.u)**2 )/(self.u*np.sqrt(2*np.pi)), axis = -1  )
+        return np.log(A+B)
