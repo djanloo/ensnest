@@ -1,2 +1,2 @@
 from .NestedSampling import *
-print('dddddd')
+from .DiffusiveNestedSampling import *

@@ -121,10 +121,12 @@ def scat3D(NS):
                np.exp(NS.points['logL']),
                c=np.exp(NS.points['logL']),
                cmap='plasma')
-    ax.set_xlabel(NS.model.names[0])
+    
     L = tuple([s[1] - s[0] for s in np.transpose(NS.model.bounds)])
     L += (8,)
     ax.set_box_aspect(L)  # aspect ratio is 1:1:1 in data space
+
+    ax.set_xlabel(NS.model.names[0])
     ax.set_ylabel(NS.model.names[1])
     ax.set_zlabel('L')
 

@@ -1,9 +1,10 @@
 import numpy as np
 from numpy.random import uniform as U
-import samplers
-import model
-from NestedSampling import mpNestedSampler as mns
-from NestedSampling import NestedSampler
+
+from .import samplers
+from .import model
+from .NestedSampling import mpNestedSampler as mns
+from .NestedSampling import NestedSampler
 
 from tqdm import tqdm, trange
 import matplotlib.pyplot as plt

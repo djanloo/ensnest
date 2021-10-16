@@ -8,7 +8,7 @@ from ensnest import stdplots
 
 my_model = model.Rosenbrock()
 
-mpns = mpNestedSampler(my_model, nlive = 500,  evosteps = 500, load_old = False, filename = 'rosenbrock')
+mpns = mpNestedSampler(my_model, nlive = 700,  evosteps = 700, load_old = False, filename = 'rosenbrock')
 
 mpns.run()
 print(f'run_time = {mpns.run_time}')
