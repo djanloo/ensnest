@@ -5,7 +5,7 @@ import sys
 from timeit import default_timer as timer
 import numpy as np
 
-N_TIME_EVAL = 1000
+N_TIMES_EVAL = 1000
 
 MULTIWALKER_TEST_SHAPE = (4, 3)
 TEST_SHAPE = (3,)
@@ -158,22 +158,22 @@ class Model:
         dummy_input = np.random.random(testshape + (self.space_dim,))
 
         start = timer()
-        for _ in range(N_TIME_EVAL):
+        for _ in range(N_TIMES_EVAL):
             dummy_result = self.log_prior(dummy_input)
         end = timer()
-        self.log_prior_execution_time_estimate = (end - start) / N_TIME_EVAL
+        self.log_prior_execution_time_estimate = (end - start) / N_TIMES_EVAL
 
         start = timer()
-        for _ in range(N_TIME_EVAL):
+        for _ in range(N_TIMES_EVAL):
             dummy_result = self.log_prior(dummy_input)
         end = timer()
         self.log_likelihood_execution_time_estimate = (
-            end - start) / N_TIME_EVAL
+            end - start) / N_TIMES_EVAL
 
         print(
             f'Correctly initialised a {self.space_dim}-D model with \n'
-            '\tT_prior      ~ {self.log_prior_execution_time_estimate*1e6:.2f} us\n'
-            '\tT_likelihood ~ {self.log_likelihood_execution_time_estimate*1e6:.2f} us')
+            f'\tT_prior      ~ {self.log_prior_execution_time_estimate*1e6:.2f} us\n'
+            f'\tT_likelihood ~ {self.log_likelihood_execution_time_estimate*1e6:.2f} us')
 
     @classmethod
     def varenv(cls, func):
@@ -237,7 +237,7 @@ class Model:
         return value
 
     @classmethod
-    def auto_bound(clss, log_func):
+    def auto_bound(cls, log_func):
         '''Decorator to bound functions.
 
         args
@@ -320,7 +320,7 @@ class Rosenbrock(Model):
 
     def set_parameters(self):
         self.bounds = ([-5., 5.], [-1, 10.])
-        self.names = ['var', 'y']
+        self.names = ['x', 'y']
 
     @Model.auto_bound
     def log_prior(self, var):

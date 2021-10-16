@@ -11,10 +11,11 @@ from sys import exit
 import numpy as np
 from numpy.random import uniform as U
 from numpy.random import randint
-import model
 from tqdm import tqdm, trange
 
 from timeit import default_timer as timer
+
+from . import model
 
 BAR_FMT = "{desc:<25.25}:{percentage:3.0f}%|{bar}|"
 BAR_FMT_EVOL = "{desc:<25.25}:{percentage:3.0f}%|{bar:10}|"
@@ -100,8 +101,8 @@ class AIESampler(Sampler):
         Output is distibuted as :math:`\\frac{1}{\\sqrt{z}}`  in :math:`[1/a,a]``.
         Uses inverse transform sampling
         '''
-        return (U(0, 1, size=size) * (self.space_scale**(1 / 2) - \
-                self.space_scale**(-1 / 2)) + self.space_scale**(-1 / 2))**2
+        return (U(0, 1, size=size) * (self.space_scale**(1 / 2) -
+                                      self.space_scale**(-1 / 2)) + self.space_scale**(-1 / 2))**2
 
     def AIEStep(self, Lthreshold=None, continuous=False):
         '''Single step of AIESampler.

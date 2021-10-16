@@ -1,8 +1,8 @@
 import numpy as np
-import model
-from NestedSampling import NestedSampler, mpNestedSampler
+from ensnest import model
+from ensnest import NestedSampler, mpNestedSampler
 import matplotlib.pyplot as plt
-import stdplots
+import ensnest.stdplots as stdplots
 
 
 class lighthouse_model(model.Model):
@@ -26,12 +26,16 @@ class lighthouse_model(model.Model):
 
 x_observations = np.array([-9.,-8.,6.,7.])
 model_         = lighthouse_model(x_observations)
-ns             = mpNestedSampler(model_, nlive = 100, evosteps = 500, load_old=False, filename='lighthouse')
+ns             = mpNestedSampler(model_,
+                                nlive = 100,
+                                evosteps = 500,
+                                load_old=True,
+                                filename='lighthouse')
 
 ns.run()
 
 stdplots.XLplot(ns)
 stdplots.hist_points(ns)
-stdplot.scat(ns)
+stdplots.scat(ns)
 
 plt.show()

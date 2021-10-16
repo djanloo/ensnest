@@ -5,9 +5,9 @@ tailored onto the AIEsampler class, so there's no choice for the sampler.
 
 import numpy as np
 
-import model
-import samplers
-import utils
+from . import model
+from . import samplers
+from . import utils
 
 from matplotlib import pyplot as plt
 from tqdm import trange, tqdm
@@ -16,6 +16,7 @@ from timeit import default_timer as time
 from scipy.stats import kstest
 
 import os
+import sys
 import pickle
 import multiprocessing as mp
 from time import sleep
@@ -103,11 +104,23 @@ class NestedSampler:
         self.delta_logX_closure = - np.cumsum(1. / self.N_closure)
 
         # save/load
+        if hasattr(sys.modules['__main__'], '__file__'):
+            #if the module is called from a file, saves results locally
+            self.path = os.path.abspath(os.path.dirname(sys.modules['__main__'].__file__))
+            self.path = os.path.join(self.path, '__inknest__')
+            try:
+                os.mkdir(self.path)
+            except FileExistsError:
+                pass
+        else:
+            #else it saves in the main directory
+            self.path = os.path('__inknest__')
+
         self.loaded = False
         self.load_old = load_old
         self.run_code = hash(self)
         self.filename = str(self.run_code) if filename is None else filename
-        self.path = os.path.join('__inknest__', self.filename)
+        self.path = os.path.join(self.path, self.filename)
 
         self.check_saved()
         self.evo_progress = evo_progress
@@ -150,8 +163,6 @@ class NestedSampler:
                 # all them
                 new = self.evo.get_new(
                     self.points['logL'][-self.nlive], progress=self.evo_progress)
-                #insert_index    = np.searchsorted(self.points['logL'],new['logL'])
-                #self.points     = np.insert(self.points, insert_index, new)
                 self.points = np.append(self.points, new)
                 # because searchsorted fails sometimes
                 self.points = np.sort(self.points, order='logL')
@@ -378,8 +389,7 @@ class mpNestedSampler(NestedSampler):
         self.filename = str(
             hash(
                 NestedSampler(
-                    *
-                    args,
+                    *args,
                     **kwargs))) if 'filename' not in kwargs else kwargs['filename']
         self.path = os.path.join('__inknest__', self.filename, 'merged')
 

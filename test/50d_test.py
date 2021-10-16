@@ -1,8 +1,10 @@
 import numpy as np
-import model
-from NestedSampling import mpNestedSampler as mpns
 import matplotlib.pyplot as plt
-import utils
+
+from ensnest import model
+from ensnest import mpNestedSampler as mpns
+from ensnest import stdplots
+from ensnest import utils
 
 class mGaussian(model.Model):
 

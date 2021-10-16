@@ -1,8 +1,9 @@
-from samplers import AIESampler
-from model import Model, Gaussian
 import numpy as np
 import matplotlib.pyplot as plt
 from timeit import default_timer as time
+
+from ensnest.samplers import AIESampler
+from ensnest.model import Model
 
 class abs_x(Model):
 

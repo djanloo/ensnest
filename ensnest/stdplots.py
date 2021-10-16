@@ -4,7 +4,7 @@ standard plots module
 
 import matplotlib.pyplot as plt
 import numpy as np
-from NestedSampling import NestedSampler, mpNestedSampler
+from .NestedSampling import NestedSampler, mpNestedSampler
 import os
 plt.rc('font', size=11)
 plt.rc('font', family='serif')
