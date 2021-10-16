@@ -22,7 +22,7 @@ For an explaination of the algorithm see ``conceptual_notes.pdf``, for the code 
 
 in 37s
 
-![eggbox](Presentazione/eggbox.png)
+![eggbox](assets/presentation/eggbox.png)
 
 
 ### Rosenbrock function
@@ -33,7 +33,7 @@ in 37s
 
 in 25s
 
-![eggbox](Presentazione/rosenbrock.png)
+![eggbox](assets/presentation/rosenbrock.png)
 
 
 ### Gaussian shells
@@ -44,7 +44,7 @@ in 25s
 
 in 62s
 
-![eggbox](Presentazione/gaussianshells.png)
+![eggbox](assets/presentation/gaussianshells.png)
 
 
 

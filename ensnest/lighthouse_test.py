@@ -25,18 +25,13 @@ class lighthouse_model(model.Model):
           return u
 
 x_observations = np.array([-9.,-8.,6.,7.])
-model_        = lighthouse_model(x_observations)
-ns            = mpNestedSampler(model_, nlive = 100, evosteps = 500, load_old=False, filename='lighthouse')
+model_         = lighthouse_model(x_observations)
+ns             = mpNestedSampler(model_, nlive = 100, evosteps = 500, load_old=False, filename='lighthouse')
 
 ns.run()
+
 stdplots.XLplot(ns)
 stdplots.hist_points(ns)
-#stdplots.scat(ns)
-#stdplots.weightscat(ns)
-#plt.scatter(ns.points['position']['a'],ns.points['position']['b'], c = ns.weigths, cmap = 'plasma',s = 10)
-plt.figure(3)
-plt.scatter(ns.ew_samples['position']['a'], ns.ew_samples['position']['b'], c=np.exp(ns.ew_samples['logL']))
-# t = np.linspace(0,1,len(ns.points))
-# plt.scatter(ns.points['position']['a'], ns.points['position']['b'], c = t, cmap = 'plasma')
+stdplot.scat(ns)
 
 plt.show()
