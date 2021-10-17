@@ -9,7 +9,6 @@ from . import model
 from . import samplers
 from . import utils
 
-from matplotlib import pyplot as plt
 from tqdm import trange, tqdm
 from timeit import default_timer as time
 
