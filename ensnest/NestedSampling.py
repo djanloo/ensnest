@@ -1,5 +1,5 @@
 '''
-The nested sampling module. In the first (and probably only) version it is mainly
+The nested sampling module. In the first (and probably only) version of ensnest it is mainly
 tailored onto the AIEsampler class, so there's no choice for the sampler.
 '''
 
