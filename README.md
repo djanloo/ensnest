@@ -46,3 +46,17 @@ in 25s
 in 62s
 
 ![eggbox](assets/presentation/gaussianshells.png)
+
+## Installation and docs
+
+Install with
+
+```console
+$ python3 setup.py install
+```
+
+Documentation can be compiled using ``Sphinx``
+
+```console
+documentation:~$ make html
+```
