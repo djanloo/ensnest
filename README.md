@@ -8,9 +8,10 @@ For an explaination of the algorithm see ``conceptual_notes.pdf``, for the code 
 
 
 ## Notable features
-- very low tuning necessary
-- correct management of multimodality
+- low tuning necessary
+- multimodal is ok
 - multiprocessed
+- lots of progress bars
 
 ## Examples
 
@@ -45,6 +46,3 @@ in 25s
 in 62s
 
 ![eggbox](assets/presentation/gaussianshells.png)
-
-
-
