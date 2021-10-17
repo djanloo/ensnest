@@ -13,8 +13,9 @@
 import os
 import sys
 import mock
-sys.path.insert(0, os.path.abspath('/home/djanloo/Scrivania/BaYESiana/DNS/ensnest'))
+#import ensnest
 
+sys.path.insert(0, os.path.abspath('..'))
 
 autodoc_mock_imports = ["numpy", 'matplotlib', 'scipy']
 

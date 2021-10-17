@@ -7,7 +7,7 @@ Code description generated automatically from docstrings.
 Model
 -----
 
-.. automodule:: model
+.. automodule:: ensnest.model
 	:special-members: __init__
 	:members:
 
@@ -15,26 +15,26 @@ Model
 Samplers
 --------
 
-.. automodule:: samplers
+.. automodule:: ensnest.samplers
 	:special-members: __init__
 	:members:
 
 NestedSampling.py
 -----------------
-.. automodule:: NestedSampling
+.. automodule:: ensnest.NestedSampling
 	:members:
 
 DiffusiveNestedSampling.py
 --------------------------
-.. automodule:: DiffusiveNestedSampling
+.. automodule:: ensnest.DiffusiveNestedSampling
 	:members:
 
 stdplots.py
 --------------------------
-.. automodule:: stdplots
+.. automodule:: ensnest.stdplots
 	:members:
 
 Utility routines
 ----------------
-.. automodule:: utils
+.. automodule:: ensnest.utils
 	:members:

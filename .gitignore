@@ -136,7 +136,7 @@ __pycache__/
 old/
 articles/
 documentation/build/*
-!*/ensnest.pdf
+!documentation/build/latex/ensnest.pdf
 *omit*
 omit/
 __inknest__/
