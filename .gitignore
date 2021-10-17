@@ -136,10 +136,11 @@ __pycache__/
 old/
 articles/
 documentation/build/*
-!*/inknest.pdf
+!*/ensnest.pdf
 *omit*
 omit/
 __inknest__/
+__ensnest__/
 _inknest_/
 *.xopp
 stats*.txt
