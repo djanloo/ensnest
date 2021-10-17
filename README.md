@@ -1,16 +1,17 @@
-# inknest
+# ensnest
 
 An ensemble nested sampling implementation using the *stretch-move-based* affine invariant ensemble sampler [(Goodman & Weare, 2010)](https://msp.org/camcos/2010/5-1/camcos-v5-n1-p04-p.pdf)
 
-For an explaination of the algorithm see ``conceptual_notes.pdf``, for the code user guide see ``documentation\build\inknest.pdf``
+For an explaination of the algorithm see ``conceptual_notes.pdf``, for the code user guide see ``documentation\build\ensnest.pdf``
 
 > **WARNING**: Due to multiprocessing issues v1.0 works only under unix-based OSs.
 
 
 ## Notable features
-- very low tuning necessary
-- correct management of multimodality
+- low tuning necessary
+- multimodal is ok
 - multiprocessed
+- lots of progress bars
 
 ## Examples
 
@@ -22,7 +23,7 @@ For an explaination of the algorithm see ``conceptual_notes.pdf``, for the code 
 
 in 37s
 
-![eggbox](Presentazione/eggbox.png)
+![eggbox](assets/presentation/eggbox.png)
 
 
 ### Rosenbrock function
@@ -33,7 +34,7 @@ in 37s
 
 in 25s
 
-![eggbox](Presentazione/rosenbrock.png)
+![eggbox](assets/presentation/rosenbrock.png)
 
 
 ### Gaussian shells
@@ -44,7 +45,4 @@ in 25s
 
 in 62s
 
-![eggbox](Presentazione/gaussianshells.png)
-
-
-
+![eggbox](assets/presentation/gaussianshells.png)

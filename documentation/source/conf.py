@@ -13,14 +13,14 @@
 import os
 import sys
 import mock
-sys.path.insert(0, os.path.abspath('/home/djanloo/Scrivania/BaYESiana/DNS'))
+sys.path.insert(0, os.path.abspath('/home/djanloo/Scrivania/BaYESiana/DNS/ensnest'))
 
 
 autodoc_mock_imports = ["numpy", 'matplotlib', 'scipy']
 
 # -- Project information -----------------------------------------------------
 
-project = 'inknest'
+project = 'ensnest'
 copyright = '2021, Gianluca Becuzzi'
 author = 'Gianluca Becuzzi'
 

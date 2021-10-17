@@ -142,6 +142,7 @@ omit/
 __inknest__/
 __ensnest__/
 _inknest_/
+__ensnest__/
 *.xopp
 stats*.txt
 
