@@ -10,7 +10,7 @@ logZ = []
 dlogZ = []
 T = []
 for dim in np.arange(50,51):
-    M  = model.Gaussian(dim = dim)
+    M  = model.nGaussian(dim = dim)
     ns = mpNestedSampler(M, nlive = 1500, evosteps = 2500, load_old=False, filename='2dgaussian')
 
     ns.run()

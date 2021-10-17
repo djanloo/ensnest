@@ -16,13 +16,17 @@ class Model:
 
     Attributes
     ----------
-        log_prior : function
-            the logarithm of the prior pdf
-        log_likelihood : function
-            the logarithm of the likelihood function
         space_bounds : 2-tuple of ``np.ndarray``
             the coordinate of the two vertices of the hyperrectangle
             defining the bounds of the parameters
+        volume : float
+            the hypervolume of the sampling space
+        names : list of `str`
+            the names of the variables
+        livepoint_t : numpy.dtype
+            the ``dtype`` used to describe live points
+        position_t : numpy.dtype
+            the ``dtype`` used to describe points in sampling space
 
     note
     ----
@@ -279,7 +283,7 @@ class Model:
 
 # some simple models useful for testing
 
-class Gaussian(Model):
+class nGaussian(Model):
     '''MVN likelihood, uniform prior.'''
 
     def __init__(self, dim=1):
