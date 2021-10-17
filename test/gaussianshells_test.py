@@ -1,8 +1,10 @@
-import model
-import NestedSampling
 import numpy as np
 import matplotlib.pyplot as plt
-import stdplots
+
+from ensnest import model
+from ensnest import mpNestedSampler
+
+from ensnest import stdplots
 
 class gshell(model.Model):
 
@@ -37,7 +39,7 @@ class gshell(model.Model):
 
 model_ = gshell()
 
-mpns = NestedSampling.mpNestedSampler(model_, nlive=500, evosteps=1000, load_old=True, filename='gaussian_shells')
+mpns = mpNestedSampler(model_, nlive=500, evosteps=1000, load_old=True, filename='gaussian_shells')
 mpns.run()
 print(f'run_time = {mpns.run_time}')
 

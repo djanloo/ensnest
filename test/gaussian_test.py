@@ -1,7 +1,9 @@
-import model
 import numpy as np
-from NestedSampling import mpNestedSampler
 import matplotlib.pyplot as plt
+
+from ensnest import model
+from ensnest import mpNestedSampler
+
 means = []
 stds = []
 logZ = []

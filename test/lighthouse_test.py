@@ -1,8 +1,9 @@
 import numpy as np
-import model
-from NestedSampling import NestedSampler, mpNestedSampler
 import matplotlib.pyplot as plt
-import stdplots
+
+from ensnest import model
+from ensnest import NestedSampler, mpNestedSampler
+from ensnest import stdplots
 
 
 class lighthouse_model(model.Model):
