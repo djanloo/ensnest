@@ -135,8 +135,6 @@ git_commands
 __pycache__/
 old/
 articles/
-documentation/build/*
-!documentation/build/latex/ensnest.pdf
 *omit*
 omit/
 __inknest__/
