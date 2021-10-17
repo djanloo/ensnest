@@ -13,6 +13,20 @@ For an explaination of the algorithm see ``conceptual_notes.pdf``, for the code 
 - multiprocessed
 - lots of progress bars
 
+## Installation and docs
+
+Install with
+
+```console
+$ python3 setup.py install
+```
+
+Documentation can be generated using ``Sphinx`` in the ``documentation`` directory
+
+```console
+documentation:~$ make html
+```
+
 ## Examples
 
 ### Eggbox model
@@ -46,17 +60,3 @@ in 25s
 in 62s
 
 ![eggbox](assets/presentation/gaussianshells.png)
-
-## Installation and docs
-
-Install with
-
-```console
-$ python3 setup.py install
-```
-
-Documentation can be generated using ``Sphinx`` in the ``documentation`` directory
-
-```console
-documentation:~$ make html
-```
