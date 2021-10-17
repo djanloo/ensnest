@@ -141,6 +141,7 @@ documentation/build/*
 omit/
 __inknest__/
 _inknest_/
+__ensnest__/
 *.xopp
 stats*.txt
 

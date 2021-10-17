@@ -107,14 +107,14 @@ class NestedSampler:
         if hasattr(sys.modules['__main__'], '__file__'):
             #if the module is called from a file, saves results locally
             self.path = os.path.abspath(os.path.dirname(sys.modules['__main__'].__file__))
-            self.path = os.path.join(self.path, '__inknest__')
+            self.path = os.path.join(self.path, '__ensnest__')
             try:
                 os.mkdir(self.path)
             except FileExistsError:
                 pass
         else:
             #else it saves in the main directory
-            self.path = os.path('__inknest__')
+            self.path = os.path('__ensnest__')
 
         self.loaded = False
         self.load_old = load_old
@@ -391,7 +391,7 @@ class mpNestedSampler(NestedSampler):
                 NestedSampler(
                     *args,
                     **kwargs))) if 'filename' not in kwargs else kwargs['filename']
-        self.path = os.path.join('__inknest__', self.filename, 'merged')
+        self.path = os.path.join('__ensnest__', self.filename, 'merged')
 
         # shuts down evo_progress
         kwargs['evo_progress'] = False
