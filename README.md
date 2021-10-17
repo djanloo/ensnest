@@ -24,7 +24,7 @@ Documentation can be generated using ``Sphinx`` in the ``documentation`` directo
 ```console
 documentation:~$ make html
 ```
-
+or viewed directly from github.
 ## Examples
 
 ### Eggbox model
