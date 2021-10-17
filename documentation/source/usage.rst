@@ -3,7 +3,7 @@ Usage
 
 Model Definition
 ````````````````
-	To define a model create a class based on :class:`model.Model` .
+	To define a model create a class based on :class:`ensnest.model.Model` .
 
 	The ``set_parameters()`` method must specify the space bounds as a list ``[ [inf1,sup1] , [inf2,sup2], .. ]``.
 	If a list of names is specified for certain variables, they can be accessed by name indexing (see :func:`~ensnest.model.Model.varenv`).
