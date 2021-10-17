@@ -55,7 +55,7 @@ Install with
 $ python3 setup.py install
 ```
 
-Documentation can be compiled using ``Sphinx``
+Documentation can be compiled using ``Sphinx`` in the ``documentation`` directory
 
 ```console
 documentation:~$ make html
