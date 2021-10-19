@@ -79,6 +79,7 @@ class NestedSampler:
         self.logdZ = None
         self.weights = None
         self.npoints = npoints
+        self.H = None
 
         # errors and time log
         self.run_again = True
@@ -175,6 +176,7 @@ class NestedSampler:
 
         self.run_time = time() - start
         self.mean_over_t()
+        self.compute_H()
         self.get_ew_samples()
         self.varenv_points()
         self.save()
@@ -271,6 +273,9 @@ class NestedSampler:
         self.Z_error = self.Z * self.logZ_error
 
         self.error_estimate_time = time() - start
+
+    def compute_H(self):
+        self.H = np.trapz(self.logL[1:-1]*np.exp(self.logX[1:-1] + self.logL[1:-1]), x=self.logX[1:-1] )*(self.Z)**(-1)
 
     def get_ew_samples(self):
         '''Generates equally weghted samples by accept/reject strategy.
@@ -380,6 +385,7 @@ class mpNestedSampler(NestedSampler):
         self.means = None
         self.stds = None
         self.ew_samples = None
+        self.H =None
 
         # save/load an time log
         self.run_time = None
@@ -436,6 +442,7 @@ class mpNestedSampler(NestedSampler):
 
         self.merge_all()
         self.mean_over_t()
+        self.compute_H()
         self.param_stats()
         self.run_time = time() - self.run_time
         self.save()
