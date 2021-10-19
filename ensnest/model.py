@@ -43,11 +43,11 @@ class Model:
     '''
     # pylint: disable=too-many-instance-attributes
 
-    def __init__(self, *args):
+    def __init__(self, *args,**kwargs):
         '''Initialise and checks the model
         '''
         # call the child function to set parameters
-        self.set_parameters(*args)
+        self.set_parameters(*args,**kwargs)
 
         # switchs between ([min1, max], [min2,max2], ..) and
         # ([min1,min2,..],[max1,max2, ..]
@@ -358,3 +358,34 @@ class PhaseTransition(Model):
             (self.par_u * np.sqrt(2 * np.pi)),
             axis=-1)
         return np.log(partial_1 + partial_2)
+
+class UniformSphere(Model):
+    '''An empty model with uniform prior over a sphere.
+
+    It is a bit a workaround since the ``self.bounds`` parameter is the hypercube
+    contained inside the sphere, some plots could have wrong lims
+
+    Args
+    ----
+        R : float
+            the radius of the sphere
+        dim : int
+            the space dimension
+    '''
+    def __init__(self, R=10.,dim=1.):
+        self.dim = dim
+        self.R = R
+        super().__init__()
+
+    def set_parameters(self):
+        self.bounds = np.ones(self.dim)*self.R
+
+    @Model.varenv
+    def log_prior(self, var):
+        mod_sq = 0
+        for name in self.names:
+            mod_sq += var[name]**2
+        outside = mod_sq > self.R**2
+        result = np.zeros(var.shape)
+        result[outside] = -np.inf
+        return result
