@@ -275,7 +275,9 @@ class NestedSampler:
         self.error_estimate_time = time() - start
 
     def compute_H(self):
-        self.H = np.trapz(self.logL[1:-1]*np.exp(self.logX[1:-1] + self.logL[1:-1]), x=self.logX[1:-1] )*(self.Z)**(-1)
+        alpha = self.logL[1:-1] - self.logZ
+        X = np.exp(self.logX[1:-1])
+        self.H = np.trapz(alpha*np.exp(alpha), x=X)
 
     def get_ew_samples(self):
         '''Generates equally weghted samples by accept/reject strategy.

@@ -27,9 +27,7 @@ ns = mpNestedSampler(M, nlive=500, evosteps=500, filename='ackley', load_old=Tru
 
 ns.run()
 
-print(f'H = {ns.H}')
-
-#stdplots.XLplot(ns)
+stdplots.XLplot(ns)
 stdplots.scat3D(ns)
 
 plt.show()
