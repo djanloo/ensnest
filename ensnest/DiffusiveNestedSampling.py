@@ -7,13 +7,27 @@ from .NestedSampling import mpNestedSampler as mns
 from .NestedSampling import NestedSampler
 
 from tqdm import tqdm, trange
-from time import sleep
+from timeit import default_timer as time
 
+import sys
+import os
 
 class mixtureAIESampler(samplers.AIESampler):
     '''An AIE sampler for mixtures of pdf.
 
     It is really problem-specific, forked from AIESampler class because of the great conceptual differences.
+
+    Allws only exponential and uniform weighting of the levels.
+
+    Attibutes
+    ---------
+        chain_j : np.ndarray
+            the chain of j values for each walker for each time
+        level_logL : np.ndarray
+        level_logX : np.ndarray
+        Lambda : float
+        chain : np.ndarray
+            the array of position, likelihood and prior of each point
     '''
 
     def __init__(
@@ -75,10 +89,10 @@ class mixtureAIESampler(samplers.AIESampler):
         if uniform_weights:
             W = 0
         else:
-            W = (new_j - j) / self.Lambda
+            W = (new_j - j) / self.Lambda - self.level_logX[new_j] + self.level_logX[j]
 
         # exponential weights
-        log_accept_prob_j = W - self.level_logX[new_j] + self.level_logX[j]
+        log_accept_prob_j = W
 
         accepted_j = (log_accept_prob_j > np.log(U(0, 1, size=self.nwalkers)))
         self.chain_j[t_next, accepted_j] = new_j[accepted_j]
@@ -86,6 +100,7 @@ class mixtureAIESampler(samplers.AIESampler):
             accepted_j)] = j[np.logical_not(accepted_j)]
 
         logL_thresholds = self.level_logL[self.chain_j[t_next]]
+
         # STANDARD AIEStep -----------------------------------------------
         # considers the whole ensamble at a time
         current_walker_position = self.chain[t_now, :]['position']
@@ -163,10 +178,23 @@ class mixtureAIESampler(samplers.AIESampler):
                 self.AIEStep(**kwargs)
         return self
 
+    def join_chains(self, burn_in=0.2, clean=True):
+        '''Joins the walkers, joins chain_j and also clean samples'''
+        j_ = self.chain_j.flatten().astype(int)
+        samps_ = self.chain.flatten()
+
+        j_ = j_[int(burn_in*len(j_)):]
+        samps_ = samps_[int(burn_in*len(samps_)):]
+
+        if clean:
+            correct = samps_['logL'] > self.level_logL[j_]
+            samps_ = samps_[correct]
+            j_     = j_[correct]
+        return (samps_, j_)
 
 class DiffusiveNestedSampler(NestedSampler):
 
-    def __init__(self, model, max_n_levels=100, nlive=100, chain_length=1000):
+    def __init__(self, model, max_n_levels=100, nlive=100, chain_length=1000, clean_samples=True, filename=None, load_old=None):
 
         self.model = model
         self.nlive = nlive
@@ -184,10 +212,19 @@ class DiffusiveNestedSampler(NestedSampler):
 
         self.sampler = mixtureAIESampler(
             self.model, chain_length, nwalkers=nlive)
+        self.clean_samples = clean_samples
 
         self.n_j = np.array([])
         self.n_exceeded = np.array([])
         self.Ncontinue = 50
+
+        #load&save
+        self.run_code = hash(self)
+        self.filename = str(self.run_code) if filename is None else filename
+        self.load_old = load_old
+        self.prepare_save_load()
+        self.path = os.path.join(self.path, 'diffusive')
+        self.check_saved()
 
     def G(self):
         ''' Theorethical cumulative density function for X,
@@ -205,11 +242,15 @@ class DiffusiveNestedSampler(NestedSampler):
 
     def run(self):
         '''Runs the code'''
+        if self.loaded:
+            print('Diffusive run loaded from file')
+            return
         current_logL_array = np.array([])
+        self.run_time = time()
         with tqdm(total=self.max_n_levels, desc='generating new levels') as pbar:
             while len(self.level_logX) < self.max_n_levels:
 
-                new = self.sampler.sample_prior().join_chains(burn_in=0.)
+                new,js = self.sampler.sample_prior().join_chains(burn_in=0., clean=self.clean_samples)
                 current_logL_array = np.append(current_logL_array, new['logL'])
                 new_level_logL = np.quantile(current_logL_array, self.G())
                 current_logL_array = np.delete(
@@ -226,17 +267,26 @@ class DiffusiveNestedSampler(NestedSampler):
                 self.n_j = np.append(self.n_j, [0])
                 self.n_exceeded = np.append(self.n_exceeded, [0])
 
-                self.revise_X(new['logL'])
+                self.revise_X(new['logL'], js)
                 pbar.update(1)
 
-        plt.plot(self.n_exceeded / self.n_j, label='before')
-        self.continue_exploration()
-        plt.plot(self.n_exceeded / self.n_j, label='after')
-        plt.legend()
-        plt.show()
-        self.close()
+        # TEST: before-revise quantities
+        self.level_logX_before_revise = self.level_logX
+        self.level_logL_before_revise = self.level_logL
+        self.level_logL_before_revise = np.append(self.level_logL_before_revise,
+                                                 [self.level_logL_before_revise[-1]])
+        self.level_logX_before_revise = np.append(self.level_logX_before_revise, [-np.inf])
+        self.Z_before_revise = np.trapz(np.exp(self.level_logL_before_revise),
+                                        x=-np.exp(self.level_logX_before_revise))
+        self.logZ_before_revise = np.log(self.Z_before_revise)
+        self.run_time_before_revise = time() - self.run_time
 
-    def revise_X(self, points_logL):
+        self.continue_exploration()
+        self.close()
+        self.run_time = time() - self.run_time
+        self.save()
+
+    def revise_X(self, points_logL, current_level_index):
         '''Revises the X values of the levels.
 
         Args
@@ -248,7 +298,6 @@ class DiffusiveNestedSampler(NestedSampler):
         # when executed after a new level is created max(j) = nlvl - 2 so max(j + 1) = nlvl -1
         # when executed in continue mode max(j)  = nlvl - 1 and max(j+1) = nlvl, so level_logL[j+1] is out of bounds sometimes
         # this is solved by deleting j and logL where j = nlvl - 1
-        current_level_index = self.sampler.chain_j.flatten().astype(np.int)
 
         filter = (current_level_index != len(self.level_logL) - 1)
         filtered_logLs = points_logL[filter]
@@ -268,16 +317,16 @@ class DiffusiveNestedSampler(NestedSampler):
     def continue_exploration(self):
         '''Continues the exploration using uniform weighting.
         '''
-        for i in trange(self.Ncontinue):
-            new = self.sampler.sample_prior(
+        for i in tqdm(range(self.Ncontinue), desc='uniform exploration'):
+            new, js = self.sampler.sample_prior(
                 uniform_weights=True).join_chains(
-                burn_in=0.)
+                burn_in=0., clean=self.clean_samples)
 
             # reset sampler on last state
             self.sampler.reset(start=self.sampler.chain[-1])
             self.sampler.chain_j[0] = self.sampler.chain_j[-1]
 
-            self.revise_X(new['logL'])
+            self.revise_X(new['logL'], js)
 
     def close(self):
 
@@ -285,3 +334,7 @@ class DiffusiveNestedSampler(NestedSampler):
         self.level_logX = np.append(self.level_logX, [-np.inf])
         self.Z = np.trapz(np.exp(self.level_logL), x=-np.exp(self.level_logX))
         self.logZ = np.log(self.Z)
+        del self.sampler # reduce useless save disk space
+
+    def __hash__(self):
+        return hash((self.model, self.nlive, self.max_n_levels, self.Xratio, self.Ncontinue ))

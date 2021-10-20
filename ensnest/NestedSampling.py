@@ -94,7 +94,7 @@ class NestedSampler:
         self.seed = 1234
         self.process_number = 0
 
-        # utils
+        # utils for counting N
         self.elapsed_clusters = 0
         self.N_continue = np.flip(np.append(
             np.arange(self.nlive, 2 * self.nlive, dtype=np.int), [self.nlive]))
@@ -103,26 +103,13 @@ class NestedSampler:
             np.arange(1, 2 * self.nlive, dtype=np.int), [self.nlive]))
         self.delta_logX_closure = - np.cumsum(1. / self.N_closure)
 
-        # save/load
-        if hasattr(sys.modules['__main__'], '__file__'):
-            #if the module is called from a file, saves results locally
-            self.path = os.path.abspath(os.path.dirname(sys.modules['__main__'].__file__))
-            self.path = os.path.join(self.path, '__ensnest__')
-            try:
-                os.mkdir(self.path)
-            except FileExistsError:
-                pass
-        else:
-            #else it saves in the main directory
-            self.path = os.path('__ensnest__')
-
-        self.loaded = False
-        self.load_old = load_old
+        #load&save
         self.run_code = hash(self)
         self.filename = str(self.run_code) if filename is None else filename
-        self.path = os.path.join(self.path, self.filename)
-
+        self.load_old = load_old
+        self.prepare_save_load()
         self.check_saved()
+
         self.evo_progress = evo_progress
 
     def initialise(self):
@@ -299,6 +286,23 @@ class NestedSampler:
             [('position', self.model.position_t), ('logL', np.float64), ('logP', np.float64)])
         self.points = self.points.view(var_names_specified_t)
         self.ew_samples = self.ew_samples.view(var_names_specified_t)
+
+    def prepare_save_load(self):
+
+        if hasattr(sys.modules['__main__'], '__file__'):
+            #if the module is called from a file, saves results locally
+            self.path = os.path.abspath(os.path.dirname(sys.modules['__main__'].__file__))
+            self.path = os.path.join(self.path, '__ensnest__')
+            try:
+                os.mkdir(self.path)
+            except FileExistsError:
+                pass
+        else:
+            #else it saves in the main directory
+            self.path = os.path('__ensnest__')
+
+        self.loaded = False
+        self.path = os.path.join(self.path, self.filename)
 
     def save(self):
         # print(f'saving on {self.path}')
