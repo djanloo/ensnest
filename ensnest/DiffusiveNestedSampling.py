@@ -269,8 +269,8 @@ class DiffusiveNestedSampler(NestedSampler):
 
                 self.revise_X(new['logL'], js)
                 pbar.update(1)
-
-        # TEST: before-revise quantities
+        plt.show()
+        # before-revise quantities
         self.level_logX_before_revise = self.level_logX
         self.level_logL_before_revise = self.level_logL
         self.level_logL_before_revise = np.append(self.level_logL_before_revise,
