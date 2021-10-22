@@ -251,7 +251,7 @@ class AIEevolver(AIESampler):
 
         # if lenght is not specified, runs continuously over two times
         if length is None:
-            length = 1000
+            length = 2
 
         super().__init__(
             model,
