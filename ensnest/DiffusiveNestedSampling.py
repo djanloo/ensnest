@@ -21,13 +21,18 @@ class mixtureAIESampler(samplers.AIESampler):
 
     Attibutes
     ---------
+
         chain_j : np.ndarray
             the chain of j values for each walker for each time
         level_logL : np.ndarray
+            likelihood levels
         level_logX : np.ndarray
+            prior mass levels
         Lambda : float
+            exploration factor
         chain : np.ndarray
             the array of position, likelihood and prior of each point
+
     '''
 
     def __init__(
