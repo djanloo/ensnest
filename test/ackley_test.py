@@ -19,7 +19,7 @@ class AckleyModel(Model):
         return np.log(partial_1 + partial_2 + offset)
 
     @Model.auto_bound
-    def log_prior(self,x):
+    def log_prior(self,var):
         return 0
 
 M = AckleyModel()
