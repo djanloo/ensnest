@@ -243,6 +243,7 @@ class NestedSampler:
             'computing Z samples',
             bar_format=BAR_FMT_ZSAMP,
                 position=self.process_number):
+                
             logt = log_worst_t_among(self.N)
 
             logX = np.cumsum(logt)

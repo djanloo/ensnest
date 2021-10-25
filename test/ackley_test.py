@@ -27,7 +27,11 @@ ns = mpNestedSampler(M, nlive=500, evosteps=500, filename='ackley', load_old=Tru
 
 ns.run()
 
-stdplots.XLplot(ns)
-stdplots.scat3D(ns)
+# stdplots.XLplot(ns)
+# stdplots.scat3D(ns)
+plt.plot(ns.logX, np.exp(ns.logX + ns.logL), color='k')
+for nns in ns.nested_samplers:
+    plt.plot(nns.logX, np.exp(nns.logX + nns.logL))
+
 
 plt.show()
