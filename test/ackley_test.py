@@ -23,15 +23,16 @@ class AckleyModel(Model):
         return 0
 
 M = AckleyModel()
-ns = mpNestedSampler(M, nlive=500, evosteps=500, filename='ackley', load_old=True)
+ns = mpNestedSampler(M, nlive=500, evosteps=500, filename='ackley', load_old=False)
 
 ns.run()
 
-# stdplots.XLplot(ns)
-# stdplots.scat3D(ns)
-plt.plot(ns.logX, np.exp(ns.logX + ns.logL), color='k')
-for nns in ns.nested_samplers:
-    plt.plot(nns.logX, np.exp(nns.logX + nns.logL))
+stdplots.XLplot(ns)
+stdplots.scat3D(ns)
+
+# plt.plot(ns.logX, np.exp(ns.logX + ns.logL), color='k')
+# for nns in ns.nested_samplers:
+#     plt.plot(nns.logX, np.exp(nns.logX + nns.logL))
 
 
 plt.show()

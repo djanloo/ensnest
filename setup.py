@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name="ensnest",
-      version="1.0",
+      version="0.1-alpha",
       packages=["ensnest"],
       author='djanloo',
       author_email='becuzzigianluca@gmail.com',
