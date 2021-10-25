@@ -2,7 +2,7 @@
 
 An ensemble nested sampling implementation using the *stretch-move-based* affine invariant ensemble sampler [(Goodman & Weare, 2010)](https://msp.org/camcos/2010/5-1/camcos-v5-n1-p04-p.pdf)
 
-> **WARNING**: Due to multiprocessing issues v1.0 works only under unix-based OSs.
+> **WARNING**: Due to multiprocessing issues v0.1-alpha works only under unix-based OSs.
 
 
 ## Notable features
