@@ -5,8 +5,12 @@ import sys
 from timeit import default_timer as timer
 import numpy as np
 
+# number of times the model function are
+# evaluated for time estimate
 N_TIMES_EVAL = 1000
 
+# shapes of the input values
+# for function test
 MULTIWALKER_TEST_SHAPE = (4, 3)
 TEST_SHAPE = (3,)
 

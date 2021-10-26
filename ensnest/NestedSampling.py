@@ -22,6 +22,9 @@ from time import sleep
 
 BAR_FMT = "{desc:<25.25}:{percentage:3.0f}%|{bar}|"
 BAR_FMT_ZSAMP = "{desc:<25.25}:{percentage:3.0f}%|{bar}|{r_bar}"
+
+# number of times the outcomes of the
+# shrinking process are simulated
 N_Z_SAMPLES = 1000
 
 np.seterr(divide='ignore')
@@ -148,11 +151,13 @@ class NestedSampler:
             while self.run_again:
                 # counts nlive points from maxL, takes the logL that contains
                 # all them
-                new = self.evo.get_new(
-                    self.points['logL'][-self.nlive], progress=self.evo_progress)
+                new = self.evo.get_new(self.points['logL'][-self.nlive],
+                                    progress=self.evo_progress)
                 self.points = np.append(self.points, new)
+
                 # because searchsorted fails sometimes
                 self.points = np.sort(self.points, order='logL')
+
                 # restarts the sampler giving last live points as initial
                 # ensemble
                 self.evo.reset(start=self.points[-self.nlive:])
@@ -162,7 +167,7 @@ class NestedSampler:
                 pbar.refresh()
 
         self.run_time = time() - start
-        self.mean_over_t()
+        self.simulate_shrink_outcomes()
         self.compute_H()
         self.get_ew_samples()
         self.varenv_points()
@@ -228,11 +233,13 @@ class NestedSampler:
 
         self.elapsed_clusters += 1
 
-    def mean_over_t(self):
-        '''Computes the mean and std of logZ and weights over t.
+    def simulate_shrink_outcomes(self):
+        '''Computes samples of logZ and p_i simulating shrinking outcomes.
 
-        The process of finding the worst among n values is simulated and
-        the mean over N_Z_SAMPLES is computed.
+        Each time a new point is harvested the prior mass is multiplied by alpha(N) < 1.
+
+        The logL(t) and N(t) arrays are the ones obtained from the run, logX is generated N_Z_SAMPLES times and
+        logZ is evaluated for each outcome of logX.
         '''
         start = time()
         self.logZ_samples = np.zeros(N_Z_SAMPLES)
@@ -243,7 +250,7 @@ class NestedSampler:
             'computing Z samples',
             bar_format=BAR_FMT_ZSAMP,
                 position=self.process_number):
-                
+
             logt = log_worst_t_among(self.N)
 
             logX = np.cumsum(logt)
@@ -271,13 +278,9 @@ class NestedSampler:
         '''Generates equally weghted samples by accept/reject strategy.
         '''
         K = np.max(self.weights)
-        accepted = (
-            self.weights /
-            K > np.random.uniform(
-                0,
-                1,
-                size=len(
-                    self.points)))
+        accepted = (self.weights / K > np.random.uniform(0,1,
+                                                        size=len(self.points))
+                    )
         self.ew_samples = self.points[accepted]
 
     def varenv_points(self):
@@ -448,7 +451,7 @@ class mpNestedSampler(NestedSampler):
                 ns.__dict__.update(tmp_dict)
 
         self.merge_all()
-        self.mean_over_t()
+        self.simulate_shrink_outcomes()
         self.compute_H()
         self.param_stats()
         self.run_time = time() - self.run_time
