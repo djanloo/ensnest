@@ -23,7 +23,7 @@ class AckleyModel(Model):
         return 0
 
 M = AckleyModel()
-ns = mpNestedSampler(M, nlive=500, evosteps=500, filename='ackley', load_old=False)
+ns = mpNestedSampler(M, nlive=500, evosteps=200, filename='ackley', load_old=False)
 
 ns.run()
 

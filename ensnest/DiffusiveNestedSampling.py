@@ -151,13 +151,10 @@ class mixtureAIESampler(samplers.AIESampler):
         # assigns accepted values
         self.chain['position'][t_next, accepted] = proposal[accepted]
         self.chain['logP'][t_next, accepted] = log_prior_proposal[accepted]
-        self.chain['logL'][t_next,
-                           accepted] = log_likelihood_proposal[accepted]
+        self.chain['logL'][t_next, accepted] = log_likelihood_proposal[accepted]
 
         # copies rejected values
-        self.chain[t_next,
-                   np.logical_not(accepted)] = self.chain[t_now,
-                                                          np.logical_not(accepted)]
+        self.chain[t_next, np.logical_not(accepted)] = self.chain[t_now, np.logical_not(accepted)]
         self.elapsed_time_index = t_next
 
     def sample_prior(self, progress=False, **kwargs):
