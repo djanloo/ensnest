@@ -1,0 +1,148 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>Example &#8212; ensnest 1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Generated code description" href="autogen.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="example">
+<h1>Example<a class="headerlink" href="#example" title="Permalink to this headline">¶</a></h1>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+
+<span class="kn">from</span> <span class="nn">ensnest.model</span> <span class="kn">import</span> <span class="n">Model</span>
+<span class="kn">from</span> <span class="nn">ensnest</span> <span class="kn">import</span> <span class="n">mpNestedSampler</span>
+<span class="kn">from</span> <span class="nn">ensnest</span> <span class="kn">import</span> <span class="n">stdplots</span>
+
+<span class="k">class</span> <span class="nc">AckleyModel</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">set_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">,</span><span class="s1">&#39;y&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bounds</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">],[</span><span class="o">-</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">]]</span>
+
+    <span class="nd">@Model</span><span class="o">.</span><span class="n">varenv</span>
+    <span class="k">def</span> <span class="nf">log_likelihood</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">var</span><span class="p">):</span>
+        <span class="n">partial_1</span> <span class="o">=</span> <span class="o">-</span><span class="mf">20.</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-.</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mf">0.5</span><span class="o">*</span><span class="p">(</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">var</span><span class="p">[</span><span class="s1">&#39;y&#39;</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span><span class="p">)))</span>
+        <span class="n">partial_2</span> <span class="o">=</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">0.5</span><span class="o">*</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">*</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">])</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">*</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;y&#39;</span><span class="p">])))</span>
+        <span class="n">offset</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">e</span> <span class="o">+</span> <span class="mf">20.</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">partial_1</span> <span class="o">+</span> <span class="n">partial_2</span> <span class="o">+</span> <span class="n">offset</span><span class="p">)</span>
+
+    <span class="nd">@Model</span><span class="o">.</span><span class="n">auto_bound</span>
+    <span class="k">def</span> <span class="nf">log_prior</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">var</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+<span class="n">M</span> <span class="o">=</span> <span class="n">AckleyModel</span><span class="p">()</span>
+<span class="n">ns</span> <span class="o">=</span> <span class="n">mpNestedSampler</span><span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="n">nlive</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">evosteps</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s1">&#39;ackley&#39;</span><span class="p">,</span> <span class="n">load_old</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<span class="n">ns</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+
+<span class="n">stdplots</span><span class="o">.</span><span class="n">XLplot</span><span class="p">(</span><span class="n">ns</span><span class="p">)</span>
+<span class="n">stdplots</span><span class="o">.</span><span class="n">scat3D</span><span class="p">(</span><span class="n">ns</span><span class="p">)</span>
+
+<span class="c1"># plt.plot(ns.logX, np.exp(ns.logX + ns.logL), color=&#39;k&#39;)</span>
+<span class="c1"># for nns in ns.nested_samplers:</span>
+<span class="c1">#     plt.plot(nns.logX, np.exp(nns.logX + nns.logL))</span>
+
+
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">ensnest</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="autogen.html">Generated code description</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Example</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="autogen.html" title="previous chapter">Generated code description</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2021, Gianluca Becuzzi.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/example.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

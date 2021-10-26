@@ -8,8 +8,9 @@ Documentation
 
 .. toctree::
    :maxdepth: 2
-   
+
    usage
-   
+
    autogen
 
+   example
