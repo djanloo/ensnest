@@ -18,7 +18,7 @@ An ensemble nested sampling implementation using the *stretch-move-based* affine
 Install with
 
 ```console
-$ python3 setup.py install
+$ sudo python3 setup.py install
 ```
 
 ## Examples
