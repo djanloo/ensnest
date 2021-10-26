@@ -147,4 +147,3 @@ stats*.txt
 
 #c stuff by cython
 *.c
-*.html
