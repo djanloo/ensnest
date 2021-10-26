@@ -282,6 +282,30 @@ class NestedSampler:
                                                         size=len(self.points))
                     )
         self.ew_samples = self.points[accepted]
+        
+    def param_stats(self):
+        '''Estimates the mean and standard deviation of the parameters'''
+        if self.model.space_dim == 1:
+            self.means = np.sum(
+                self.weights * self.points['position'][self.model.names[0]], axis=0)
+            self.stds = np.sum(self.weights * (
+                (self.points['position'][self.model.names[0]] - self.means)**2
+            ), axis=0)
+            self.stds = np.sqrt(self.stds)
+
+            self.means = self.means.view(self.model.position_t)
+            self.stds = self.stds.view(self.model.position_t)
+        else:
+            num_dtype = (np.float64, self.model.space_dim)
+            self.means = np.sum(
+                self.weights[:, None] * self.points['position'].copy().view(num_dtype), axis=0)
+            self.stds = np.sum(self.weights[:, None] *
+                               ((self.points['position'].copy().view(num_dtype) -
+                                 self.means)**2), axis=0)
+            self.stds = np.sqrt(self.stds)
+
+            self.means = self.means.view(self.model.position_t)
+            self.stds = self.stds.view(self.model.position_t)
 
     def varenv_points(self):
         '''Gives usable fields to ``self.points['position']`` based on ``model.names``
@@ -509,27 +533,3 @@ class mpNestedSampler(NestedSampler):
 
         self.points = self.points[np.argsort(self.points['logL'])]
         self.ew_samples = self.ew_samples[np.argsort(self.ew_samples['logL'])]
-
-    def param_stats(self):
-        '''Estimates the mean and standard deviation of the parameters'''
-        if self.model.space_dim == 1:
-            self.means = np.sum(
-                self.weights * self.points['position'][self.model.names[0]], axis=0)
-            self.stds = np.sum(self.weights * (
-                (self.points['position'][self.model.names[0]] - self.means)**2
-            ), axis=0)
-            self.stds = np.sqrt(self.stds)
-
-            self.means = self.means.view(self.model.position_t)
-            self.stds = self.stds.view(self.model.position_t)
-        else:
-            num_dtype = (np.float64, self.model.space_dim)
-            self.means = np.sum(
-                self.weights[:, None] * self.points['position'].copy().view(num_dtype), axis=0)
-            self.stds = np.sum(self.weights[:, None] *
-                               ((self.points['position'].copy().view(num_dtype) -
-                                 self.means)**2), axis=0)
-            self.stds = np.sqrt(self.stds)
-
-            self.means = self.means.view(self.model.position_t)
-            self.stds = self.stds.view(self.model.position_t)
