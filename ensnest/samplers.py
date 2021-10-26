@@ -37,13 +37,12 @@ class Sampler:
             the number of walkers the ensamble is made of
     """
 
-    def __init__(self, model, mcmc_length, nwalkers, verbosity=0):
+    def __init__(self, model, mcmc_length, nwalkers):
         """Initialise the chain uniformly over the space bounds.
         """
         self.model = model
         self.length = mcmc_length
         self.nwalkers = nwalkers
-        self.verbosity = verbosity
         self.elapsed_time_index = 0  # 'time' index up to which self.chain has been developed
 
         # the squeeze method is for mantaining generality. Single-walker
@@ -82,17 +81,13 @@ class AIESampler(Sampler):
             model,
             mcmc_length,
             nwalkers=10,
-            space_scale=None,
-            verbosity=0):
+            a=None):
 
-        super().__init__(model, mcmc_length, nwalkers, verbosity=verbosity)
-        # if space_scale is not defined takes the 'diameter' of the space
-        self.space_scale = 3.
-        #self.space_scale = space_scale if space_scale is not None else 0.5*np.sqrt(np.sum(self.model.bounds[0]**2)) + 0.5*np.sqrt(np.sum(self.model.bounds[1]**2))
-        # print(f'sampler initialised with a-parameter = {self.space_scale:.2f}')
-        if self.space_scale <= 1:
+        super().__init__(model, mcmc_length, nwalkers)
+        self.a = 3. if a is None else a
+        if self.a <= 1:
             print('space scale parameter must be > 1: set 2')
-            self.space_scale = 2.
+            self.a = 2.
 
     def get_stretch(self, size=1):
         '''
@@ -101,8 +96,8 @@ class AIESampler(Sampler):
         Output is distibuted as :math:`\\frac{1}{\\sqrt{z}}`  in :math:`[1/a,a]``.
         Uses inverse transform sampling
         '''
-        return (U(0, 1, size=size) * (self.space_scale**(1 / 2) -
-                                      self.space_scale**(-1 / 2)) + self.space_scale**(-1 / 2))**2
+        return (U(0, 1, size=size) * (self.a**(1 / 2) -
+                                      self.a**(-1 / 2)) + self.a**(-1 / 2))**2
 
     def AIEStep(self, Lthreshold=None, continuous=False):
         '''Single step of AIESampler.
@@ -246,8 +241,7 @@ class AIEevolver(AIESampler):
             steps,
             length=None,
             nwalkers=10,
-            verbosity=0,
-            space_scale=None):
+            a=None):
 
         # if lenght is not specified, runs continuously over two times
         if length is None:
@@ -257,8 +251,7 @@ class AIEevolver(AIESampler):
             model,
             length,
             nwalkers=nwalkers,
-            verbosity=verbosity,
-            space_scale=space_scale)
+            a=a)
         self.steps = steps
         # since most of the memory is lost, takes the initial situation for
         # duplicate check

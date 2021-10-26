@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from .NestedSampling import NestedSampler, mpNestedSampler
 import os
+
+from scipy import stats
+
 plt.rc('font', size=11)
 plt.rc('font', family='serif')
 
@@ -121,7 +124,7 @@ def scat3D(NS):
                np.exp(NS.points['logL']),
                c=np.exp(NS.points['logL']),
                cmap='plasma')
-    
+
     L = tuple([s[1] - s[0] for s in np.transpose(NS.model.bounds)])
     L += (8,)
     ax.set_box_aspect(L)  # aspect ratio is 1:1:1 in data space
@@ -155,3 +158,34 @@ def weightscat(NS, fig_ax=None):
 
     savepath = os.path.join(os.path.dirname(NS.path), f'weightscat.pdf')
     plt.savefig(savepath)
+
+def contour(NS, density_of_points=200, **contour_kwargs):
+    '''After a kernel density estimation plots the contour of the points' density (2D data only)'''
+    if NS.model.space_dim != 2:
+        raise ValueError('Space dimension is not 2')
+    x, y = NS.points['position'][NS.model.names[0]], NS.points['position'][NS.model.names[1]]
+    X, Y = np.mgrid[min(x):max(x):int(density_of_points)*1j, min(y):max(y):int(density_of_points)*1j]
+    positions = np.vstack([X.ravel(), Y.ravel()])
+    values = np.vstack([x, y])
+    kernel = stats.gaussian_kde(values, weights=NS.weights)
+    Z = np.reshape(kernel(positions).T, X.shape)
+
+    fig, ax = plt.subplots(1)
+    ax.contour(X,Y,Z,**contour_kwargs)
+    MLindex = np.argmax(NS.points['logL'])
+    MLx,MLy = NS.points['position'][NS.model.names[0]][MLindex], NS.points['position'][NS.model.names[1]][MLindex]
+    ax.scatter([MLx],[MLy],zorder=100)
+
+def contourf(NS, density_of_points=500, **contour_kwargs):
+    '''After a kernel density estimation plots the contour of the points' density (2D data only)'''
+    if NS.model.space_dim != 2:
+        raise ValueError('Space dimension is not 2')
+    x, y = NS.points['position'][NS.model.names[0]], NS.points['position'][NS.model.names[1]]
+    X, Y = np.mgrid[min(x):max(x):int(density_of_points)*1j, min(y):max(y):int(density_of_points)*1j]
+    positions = np.vstack([X.ravel(), Y.ravel()])
+    values = np.vstack([x, y])
+    kernel = stats.gaussian_kde(values, weights=NS.weights)
+    Z = np.reshape(kernel(positions).T, X.shape)
+
+    fig, ax = plt.subplots(1)
+    ax.contourf(X,Y,Z,**contour_kwargs)

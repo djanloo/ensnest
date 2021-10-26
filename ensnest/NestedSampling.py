@@ -51,7 +51,8 @@ class NestedSampler:
     def __init__(self, model,
                  nlive=1000, npoints=np.inf,
                  evosteps=150, relative_precision=1e-4,
-                 load_old=None, filename=None, evo_progress=True):
+                 load_old=None, filename=None, evo_progress=True,
+                 a=None):
         ''' NS initialisation.
 
         Args
@@ -66,6 +67,8 @@ class NestedSampler:
                 specify whether to load an existing run
 
                 if not specified, the user will be asked in runtime in case an old run is found
+            a : ``float`` > 1
+                the inteval constant for AIES
         '''
         # run fundamentals
         self.model = model
