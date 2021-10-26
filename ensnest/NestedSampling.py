@@ -292,6 +292,7 @@ class NestedSampler:
         self.ew_samples = self.ew_samples.view(var_names_specified_t)
 
     def prepare_save_load(self):
+        '''Creates (if not already present) the save directory for the run'''
 
         if hasattr(sys.modules['__main__'], '__file__'):
             #if the module is called from a file, saves results locally
@@ -427,7 +428,7 @@ class mpNestedSampler(NestedSampler):
 
     def execute_and_save(self, ns):
         ns.run()
-        ns.save()  # clumsy way to communicate between parent/child process
+        # ns.save()  # clumsy way to communicate between parent/child process
 
     def run(self):
         if self.loaded:

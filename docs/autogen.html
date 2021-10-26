@@ -16,7 +16,7 @@
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="prev" title="Usage" href="usage.html" />
+    <link rel="prev" title="Example" href="example.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -542,17 +542,24 @@ tailored onto the AIEsampler class, so there’s no choice for the sampler.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="ensnest.NestedSampling.NestedSampler.mean_over_t">
-<span class="sig-name descname"><span class="pre">mean_over_t</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ensnest.NestedSampling.NestedSampler.mean_over_t" title="Permalink to this definition">¶</a></dt>
-<dd><p>Computes the mean and std of logZ and weights over t.</p>
-<p>The process of finding the worst among n values is simulated and
-the mean over N_Z_SAMPLES is computed.</p>
+<dt class="sig sig-object py" id="ensnest.NestedSampling.NestedSampler.prepare_save_load">
+<span class="sig-name descname"><span class="pre">prepare_save_load</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ensnest.NestedSampling.NestedSampler.prepare_save_load" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates (if not already present) the save directory for the run</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="ensnest.NestedSampling.NestedSampler.run">
 <span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ensnest.NestedSampling.NestedSampler.run" title="Permalink to this definition">¶</a></dt>
 <dd><p>Performs nested sampling.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ensnest.NestedSampling.NestedSampler.simulate_shrink_outcomes">
+<span class="sig-name descname"><span class="pre">simulate_shrink_outcomes</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ensnest.NestedSampling.NestedSampler.simulate_shrink_outcomes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes samples of logZ and p_i simulating shrinking outcomes.</p>
+<p>Each time a new point is harvested the prior mass is multiplied by alpha(N) &lt; 1.</p>
+<p>The logL(t) and N(t) arrays are the ones obtained from the run, logX is generated N_Z_SAMPLES times and
+logZ is evaluated for each outcome of logX.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -955,6 +962,7 @@ Given a  vector [a1,a2,a3, … ] returns <span class="math notranslate nohighlig
 <h3>Navigation</h3>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="example.html">Example</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Generated code description</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#module-ensnest.model">Model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-ensnest.samplers">Samplers</a></li>
@@ -970,7 +978,7 @@ Given a  vector [a1,a2,a3, … ] returns <span class="math notranslate nohighlig
 <h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="usage.html" title="previous chapter">Usage</a></li>
+      <li>Previous: <a href="example.html" title="previous chapter">Example</a></li>
   </ul></li>
 </ul>
 </div>
