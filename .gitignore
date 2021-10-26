@@ -130,7 +130,6 @@ dmypy.json
 
 
 #my files
-!documentation/build
 What_i_learned_on_sphinx
 git_commands
 __pycache__/
