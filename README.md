@@ -1,6 +1,7 @@
 # ensnest
 
 [![docs - passing](https://img.shields.io/static/v1?label=docs&message=passing&color=2ea44f)](https://djanloo.github.io/ensnest/)
+![os](https://img.shields.io/static/v1?label=os&message=Linux&color=2ea44f)
 
 An ensemble nested sampling implementation using the *stretch-move-based* affine invariant ensemble sampler [(Goodman & Weare, 2010)](https://msp.org/camcos/2010/5-1/camcos-v5-n1-p04-p.pdf)
 
