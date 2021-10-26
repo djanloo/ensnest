@@ -7,9 +7,9 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="11.221703mm"
+   width="22.569075mm"
    height="4.5888538mm"
-   viewBox="0 0 11.221703 4.5888537"
+   viewBox="0 0 22.569075 4.5888537"
    version="1.1"
    id="svg8"
    inkscape:version="1.0.2 (e86c870879, 2021-01-15)"
@@ -58,13 +58,13 @@
      id="layer1"
      transform="translate(-46.424206,-69.207893)">
     <rect
-       style="fill:#21ff00;fill-opacity:1;stroke-width:0.525669;stroke-dasharray:0.525669, 1.57701"
+       style="fill:#21ff00;fill-opacity:1;stroke-width:0.745487;stroke-dasharray:0.745487, 2.23646"
        id="rect835"
-       width="11.221703"
+       width="22.569075"
        height="4.5888538"
        x="46.424206"
        y="69.207893"
-       rx="1.3885645"
+       rx="2.7926793"
        ry="1.3885645" />
     <text
        xml:space="preserve"
