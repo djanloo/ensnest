@@ -129,8 +129,8 @@ class NestedSampler:
                 self.evo.chain[self.evo.elapsed_time_index], order='logL')
 
             # integrate the first zone: (1-<X0>)*L0
-            self.logZ = utils.logsubexp(
-                0, -1. / self.nlive) + self.points['logL'][0]
+            self.logZ = utils.logsubexp(0, -1. / self.nlive) \
+                        + self.points['logL'][0]
             self.logdZ_max_estimate = self.points['logL'][-1] + self.logX[-1]
 
             self.progress_offset = self.logZ - \
@@ -246,10 +246,10 @@ class NestedSampler:
         self.weights = np.zeros(len(self.points))
         logt = np.zeros(len(self.N))
         for i in tqdm(
-            range(N_Z_SAMPLES),
-            'computing Z samples',
-            bar_format=BAR_FMT_ZSAMP,
-                position=self.process_number):
+                    range(N_Z_SAMPLES),
+                    'computing Z samples',
+                    bar_format=BAR_FMT_ZSAMP,
+                    position=self.process_number):
 
             logt = log_worst_t_among(self.N)
 
@@ -257,8 +257,8 @@ class NestedSampler:
             logX = np.insert(logX, len(logX), -np.inf)
             logX = np.insert(logX, 0, 0)
 
-            self.logZ_samples[i] = np.log(
-                -np.trapz(np.exp(self.logL), x=np.exp(logX)))
+            self.logZ_samples[i] = np.log(-np.trapz(np.exp(self.logL),
+                                                        x=np.exp(logX)))
             self.weights -= np.exp(self.logL[1:-1]) * np.diff(np.exp(logX[1:])) / np.exp(
                 self.logZ_samples[i]) / N_Z_SAMPLES  # <L_i * w_i / Z >t
 
@@ -282,7 +282,7 @@ class NestedSampler:
                                                         size=len(self.points))
                     )
         self.ew_samples = self.points[accepted]
-        
+
     def param_stats(self):
         '''Estimates the mean and standard deviation of the parameters'''
         if self.model.space_dim == 1:

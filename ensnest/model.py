@@ -199,7 +199,7 @@ class Model:
             >>> @varenv
             >>> def f(self,var):
             >>>      u = var['A']+var['mu']
-            >>>      ... do stuff
+            >>>      #... do stuff
         '''
 
         def _wrap(self, var, *args, **kwargs):
