@@ -11,6 +11,6 @@ Documentation
 
    usage
 
-   autogen
-
    example
+
+   autogen
