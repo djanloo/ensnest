@@ -13,7 +13,7 @@ An ensemble nested sampling implementation using the *stretch-move-based* affine
 - multiprocessed
 - lots of progress bars
 
-## Installation and docs
+## Installation
 
 Install with
 
@@ -21,12 +21,6 @@ Install with
 $ python3 setup.py install
 ```
 
-Documentation can be generated using ``Sphinx`` in the ``documentation`` directory
-
-```console
-documentation:~$ make html
-```
-or viewed directly from github.
 ## Examples
 
 ### Eggbox model
