@@ -25,14 +25,14 @@ class lighthouse_model(model.Model):
               u += np.log(vars['b']) - np.log(vars['b']**2 + (self.data[i] - vars['a'])**2)
           return u
 
-# x_observations = np.array([-9.,-8.,6.,7.])
-x_observations = np.array([-9.1,8.,6])
+x_observations = np.array([-9.,-8.,6.,7.])
+# x_observations = np.array([-9.1,8.,6])
 
 M  = lighthouse_model(x_observations)
 ns = mpNestedSampler(M,
                     nlive=500,
                     evosteps=500,
-                    load_old=True,
+                    load_old=False,
                     filename='lighthouse',
                     a=3.
                     )
@@ -43,6 +43,6 @@ ns.run()
 # stdplots.hist_points(ns)
 stdplots.scat(ns)
 # stdplots.weightscat(ns)
-stdplots.contour(ns, levels=20, cmap='plasma')
+# stdplots.contour(ns, levels=20, cmap='plasma')
 
 plt.show()

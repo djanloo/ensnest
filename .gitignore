@@ -143,6 +143,7 @@ _inknest_/
 __ensnest__/
 *.xopp
 stats*.txt
+assets/
 
 #c stuff by cython
 *.c
