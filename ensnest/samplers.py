@@ -257,7 +257,15 @@ class AIEevolver(AIESampler):
         # duplicate check
         self.start_ensemble = self.chain[0]
 
-    def init(self, progress_position=0):
+    def init(self, progress_position=0, init_positions=None):
+        if init_positions is not None:
+
+            self.chain['position'][0] = init_positions
+            self.chain['logP'][0] = self.model.log_prior(
+                self.chain[0]['position'])
+            self.chain['logL'][0] = self.model.log_likelihood(
+                self.chain[0]['position'])
+
         for i in tqdm(
                 range(
                     self.steps),

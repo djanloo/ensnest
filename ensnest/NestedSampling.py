@@ -118,8 +118,13 @@ class NestedSampler:
 
         self.evo_progress = evo_progress
 
-    def initialise(self):
-        '''Initialises the evolver and Z value'''
+    def initialise(self, init_positions=None):
+        '''Initialises the evolver and Z value
+        
+        Args
+        ----
+            positions : initial position of each walker of the sample
+        '''
         # for subprocesses: force seed update to prevent identical copies after
         # process fork
         np.random.seed(self.seed)
@@ -127,6 +132,7 @@ class NestedSampler:
             # initialises the sampler (AIES is the only option currently)
             self.evo = samplers.AIEevolver(
                 self.model, self.evosteps, nwalkers=self.nlive).init(
+                    init_positions=init_positions,
                 progress_position=self.process_number)
             self.points = np.sort(
                 self.evo.chain[self.evo.elapsed_time_index], order='logL')
@@ -148,6 +154,7 @@ class NestedSampler:
             print('Run loaded from file')
             return
         start = time()
+        np.random.seed(self.seed) # Repeated for unparallelized initialization
         with tqdm(total=1., desc='nested sampling', unit_scale=True, colour='blue', bar_format=BAR_FMT, position=self.process_number) as pbar:
 
             # main loop
