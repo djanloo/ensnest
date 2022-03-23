@@ -2,14 +2,11 @@ import numpy as np
 from numpy.random import uniform as U
 
 from . import samplers
-from . import model
-from .NestedSampling import mpNestedSampler as mns
 from .NestedSampling import NestedSampler
 
 from tqdm import tqdm, trange
 from timeit import default_timer as time
 
-import sys
 import os
 
 
