@@ -15,7 +15,7 @@ import sys
 import mock
 #import ensnest
 
-sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('..'))
 print(f"current path is{sys.path}")
 autodoc_mock_imports = ["numpy", 'matplotlib', 'scipy']
 
