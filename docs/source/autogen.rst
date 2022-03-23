@@ -24,11 +24,6 @@ NestedSampling.py
 .. automodule:: ensnest.NestedSampling
 	:members:
 
-DiffusiveNestedSampling.py
---------------------------
-.. automodule:: ensnest.DiffusiveNestedSampling
-	:members:
-
 stdplots.py
 --------------------------
 .. automodule:: ensnest.stdplots
