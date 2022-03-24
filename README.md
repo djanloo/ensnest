@@ -16,12 +16,13 @@ An ensemble [nested sampling](https://projecteuclid.org/journals/bayesian-analys
 
 ## Installation
 
-Install with
+Install running
 
 ```console
-$ python3 setup.py install
+$ pip install .
 ```
 
+in the main folder.
 ## Examples
 
 ### Eggbox model
